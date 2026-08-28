@@ -1,0 +1,6 @@
+{
+  "_comment": "首页配置：使用自定义导航栏 (navigationStyle: custom)，\n            由页面 wxml 绘制整个欢迎界面，不显示系统导航条。",
+  "usingComponents": {},
+  "navigationBarTitleText": "拓拓 AI 助手",
+  "navigationStyle": "custom"
+}

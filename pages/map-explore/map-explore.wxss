@@ -1,0 +1,981 @@
+/* ========================================================================
+ * 【佗城·赵佗历史文化之旅】地图探索页样式表 (map-explore.wxss)
+ * ------------------------------------------------------------------------
+ * 设计语言：沉浸式南越古国历史风 —— 以「暗木+古铜金+宣纸」三色构建时代感
+ *   主色板：
+ *     #c9a96e  —— 古铜金主色（南越王赵佗的帝王铜器色，用于标题、按钮、边框、光晕，象征尊贵与历史厚重）
+ *     #1a1410  —— 暗木色背景（古代木构建筑基调，用于页面背景、弹窗底色，营造沉郁深邃的千年氛围）
+ *     #e8dcc0  —— 宣纸浅色字（古代书卷墨色底上的正文色，用于叙事文本、剧情文字，保证阅读舒适度）
+ *     #d4a856  —— 古铜金次色（较 #c9a96e 更亮，用于静音按钮、次要边框高亮）
+ *     #8a7a5e  —— 暗金灰（副标题、辅助标签的弱化文字色，不抢主视觉）
+ *     #ff4757  —— 朱红警示（当前激活热区 / 拍卡按钮，用于吸引用户注意的操作点）
+ *     #07C160  —— 微信绿（自由闲聊按钮，呼应微信原生生态色）
+ *     rgba(100,180,255,x) —— 起点蓝金光晕（用于起点热区和赵佗虚影，暗示神话/穿越感）
+ * ======================================================================== */
+
+/* ==================== 全局容器与通用类 ==================== */
+/* 根容器：全屏占满（100vh），暗木色底色，溢出隐藏以避免地图滚出边界 */
+.map-page {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  background: #1a1410;           /* 暗木色背景：全局视觉基调 */
+  overflow: hidden;
+}
+
+/* 通用显隐工具类 —— !important 保证任何条件分支下显隐优先级最高 */
+.hidden { display: none !important; }
+.visible { display: flex !important; }
+
+/* ============ 右上角静音按钮（与 chat.wxss 同一套视觉系统）============ */
+/* 按钮本体：圆形悬浮于右上角（z-index:9999 保证在所有 UI 之上），古铜金边 + 半透明暗木底 */
+.mute-btn {
+  position: fixed;
+  top: 60rpx;
+  right: 30rpx;
+  width: 80rpx;
+  height: 80rpx;
+  background: rgba(26, 16, 8, 0.85);  /* 暗木色半透底，防止地图上的杂色干扰 */
+  border: 2rpx solid #d4a856;         /* 古铜金次色边框 */
+  border-radius: 50%;
+  z-index: 9999;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+/* 按下微缩反馈：提升点击体感 */
+.mute-btn:active {
+  transform: scale(0.9);
+}
+
+/* 图标容器：有声 / 静音两套，绝对定位叠加绘制 */
+.mute-icon-sound,
+.mute-icon-mute {
+  position: relative;
+  width: 48rpx;
+  height: 48rpx;
+}
+
+/* 铃铛主体（喇叭形状）：用 CSS 三角形 + 矩形组合绘制，古铜金次色填充 */
+.sound-bell {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 14rpx solid transparent;
+  border-bottom: 14rpx solid transparent;
+  border-right: 18rpx solid #d4a856;   /* 古铜金次色：喇叭本体 */
+}
+
+/* 铃铛把手：向右延伸的小矩形，构成完整喇叭造型 */
+.sound-bell::before {
+  content: '';
+  position: absolute;
+  right: -28rpx;
+  top: -10rpx;
+  width: 14rpx;
+  height: 20rpx;
+  background: #d4a856;                /* 古铜金次色：喇叭把手 */
+  border-radius: 4rpx;
+}
+
+/* 声波扩散线：三层同心半圆弧，有声时通过 CSS 动画呈现呼吸感 */
+.sound-wave {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 3rpx solid #d4a856;         /* 古铜金次色：声波弧线 */
+  border-left: none;
+  border-radius: 0 50% 50% 0;
+  background: transparent;
+}
+
+/* 第一层：最短最内圈 */
+.sound-wave.w1 {
+  width: 10rpx;
+  height: 14rpx;
+  right: -12rpx;
+}
+
+/* 第二层：中间圈 */
+.sound-wave.w2 {
+  width: 16rpx;
+  height: 22rpx;
+  right: -22rpx;
+}
+
+/* 第三层：最长最外圈 */
+.sound-wave.w3 {
+  width: 22rpx;
+  height: 30rpx;
+  right: -34rpx;
+}
+
+/* 有声状态下三层声波错峰呼吸动画 —— 错峰 0.2s 模拟声波由内向外扩散 */
+.mute-icon-sound .sound-wave.w1 { animation: waveAnim 1.2s ease-in-out infinite 0s; }
+.mute-icon-sound .sound-wave.w2 { animation: waveAnim 1.2s ease-in-out infinite 0.2s; }
+.mute-icon-sound .sound-wave.w3 { animation: waveAnim 1.2s ease-in-out infinite 0.4s; }
+
+/* 声波呼吸关键帧：opacity + scaleX 同步变化 */
+@keyframes waveAnim {
+  0%, 100% { opacity: 1; transform: translateY(-50%) scaleX(1); }
+  50% { opacity: 0.4; transform: translateY(-50%) scaleX(0.6); }
+}
+
+/* 静音状态下声波整体降透明度 —— 视觉上提示声音已关闭 */
+.mute-icon-mute .sound-wave {
+  opacity: 0.3;
+}
+
+/* 静音红色斜杠：醒目红色 + 发光阴影，一眼识别关闭状态 */
+.sound-slash {
+  position: absolute;
+  width: 60rpx;
+  height: 3rpx;
+  background: #ff6b6b;                 /* 警示红：静音标志色 */
+  left: -6rpx;
+  top: 50%;
+  transform: translateY(-50%) rotate(-35deg);
+  border-radius: 2rpx;
+  box-shadow: 0 0 8rpx rgba(255, 107, 107, 0.6);
+}
+
+/* ==================== 开场引导层 —— 进入页面前的赵佗「接旨入城」引导 ==================== */
+/* 全屏遮罩：fixed + inset:0，用 z-index:999 覆盖主地图，仅低于静音按钮 */
+.intro-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.8s ease;          /* 淡入淡出过渡 */
+}
+
+/* 显示态：不透明 + 可交互 */
+.intro-fade-in {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 隐藏态：透明 + 点击穿透（让下方主地图接收触摸） */
+.intro-fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 遮罩背景：径向渐变中心亮→四周暗，营造聚光舞台感 */
+.intro-mask-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(40, 20, 10, 0.85) 0%, rgba(10, 5, 2, 0.97) 60%, rgba(0, 0, 0, 1) 100%);
+}
+
+/* 引导面板容器：居中放置头像+标题+对白+按钮 */
+.intro-panel {
+  position: relative;
+  width: 620rpx;
+  padding: 60rpx 50rpx 50rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 卷轴装饰线：上下两条古铜金渐变线，仿古代卷轴两端封边 */
+.intro-scroll-decoration {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  height: 4rpx;
+  background: linear-gradient(90deg, transparent, #c9a96e, transparent);  /* 古铜金主色渐变卷轴边 */
+}
+
+.intro-scroll-decoration.top { top: 10rpx; }
+.intro-scroll-decoration.bottom { bottom: 10rpx; }
+
+/* 赵佗引导头像：圆形 + 古铜金粗边框，视觉中心元素 */
+.intro-npc {
+  width: 280rpx;
+  height: 280rpx;
+  border-radius: 50%;
+  border: 4rpx solid #c9a96e;           /* 古铜金主色边框：帝王感 */
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 2;
+  position: relative;
+}
+
+/* 头像外发光光晕：径向渐变古铜金，呼吸脉冲动画赋予神性 */
+.intro-npc-glow {
+  position: absolute;
+  width: 320rpx;
+  height: 320rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.35) 0%, transparent 70%);  /* 古铜金柔光 */
+  animation: npcGlow 3s ease-in-out infinite;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* NPC 光晕呼吸：opacity + 缩放 联动 */
+@keyframes npcGlow {
+  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* 开场标题：古铜金大字，宽字距营造庄严感 */
+.intro-title {
+  margin-top: 30rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #c9a96e;                       /* 古铜金主色：标题文字色 */
+  letter-spacing: 12rpx;
+  text-shadow: 0 0 20rpx rgba(201, 169, 110, 0.5);
+  z-index: 2;
+}
+
+/* 引导对白框：半透明暗木底 + 古铜金边，仿古代竹简/对白盒 */
+.intro-dialog-box {
+  margin-top: 30rpx;
+  padding: 30rpx 36rpx;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2rpx solid rgba(201, 169, 110, 0.4);   /* 古铜金主色半透边 */
+  border-radius: 16rpx;
+  max-width: 520rpx;
+  z-index: 2;
+  min-height: 180rpx;                          /* 固定最小高度，防打字过程布局跳动 */
+}
+
+/* 引导对白文字：宣纸浅色 + 楷体字，书卷叙事感 */
+.intro-dialog-text {
+  font-size: 28rpx;
+  color: #e8dcc0;                       /* 宣纸浅色字：叙事正文色 */
+  line-height: 1.9;
+  letter-spacing: 2rpx;
+  font-family: "KaiTi", "STKaiti", serif;        /* 楷体：古风文字 */
+}
+
+/* 打字机光标：古铜金闪烁竖线 */
+.cursor {
+  display: inline;
+  color: #c9a96e;                       /* 古铜金主色：光标色 */
+  animation: cursorBlink 0.8s step-end infinite;
+  font-weight: 700;
+}
+
+/* 光标闪烁：opacity 0↔1 硬切换 */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 入场按钮包裹层：打字完成后淡入出现 */
+.intro-btn-wrap {
+  margin-top: 40rpx;
+  z-index: 2;
+  animation: btnFadeIn 0.6s ease;
+}
+
+/* 按钮淡入：透明度 + 20rpx 上移组合 */
+@keyframes btnFadeIn {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 「接旨入城」按钮：古铜金渐变主按钮 + 双层光效 */
+.intro-enter-btn {
+  width: 360rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, #c9a96e 0%, #8b6914 50%, #c9a96e 100%);   /* 古铜金→深棕金→古铜金 立体渐变 */
+  color: #1a1410;                         /* 暗木色反字：金底暗字，对比强烈 */
+  font-size: 34rpx;
+  font-weight: 700;
+  letter-spacing: 12rpx;
+  border-radius: 48rpx;
+  border: 2rpx solid #e8d5a0;             /* 浅金高亮边，增加按钮立体边光 */
+  box-shadow: 0 6rpx 24rpx rgba(201, 169, 110, 0.5), 0 0 60rpx rgba(201, 169, 110, 0.3);
+  position: relative;
+  padding: 0;
+}
+
+/* 去除微信按钮默认边框（小程序默认 after 有 border） */
+.intro-enter-btn::after { border: none; }
+
+.intro-enter-btn .btn-text { position: relative; z-index: 2; }
+
+/* 按钮外层发光晕：古铜金径向渐变呼吸动画 */
+.btn-glow {
+  position: absolute;
+  inset: -10rpx;
+  border-radius: 54rpx;
+  background: radial-gradient(ellipse at center, rgba(201, 169, 110, 0.4) 0%, transparent 70%);
+  animation: btnGlow 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes btnGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ==================== 主地图层 —— 引导层消失后展示的真实地图交互区 ==================== */
+/* 主层容器：绝对定位铺满，开场 opacity=0（被引导层遮住），淡入延迟 0.3s 避免闪烁 */
+.main-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: opacity 0.6s ease 0.3s;
+}
+
+.main-layer.visible {
+  opacity: 1;
+}
+
+/* 页面顶部信息栏：渐变透明→暗木色，承载标题和打卡进度 */
+.page-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 30rpx 16rpx;
+  background: linear-gradient(180deg, rgba(20, 15, 10, 0.95) 0%, rgba(20, 15, 10, 0.7) 80%, transparent 100%);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* 主标题：古铜金粗体 */
+.header-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #c9a96e;                       /* 古铜金主色：标题 */
+  letter-spacing: 6rpx;
+}
+
+/* 副标题：暗金灰弱化 */
+.header-sub {
+  display: block;
+  font-size: 22rpx;
+  color: #8a7a5e;                       /* 暗金灰：辅助副标题 */
+  margin-top: 6rpx;
+  letter-spacing: 3rpx;
+}
+
+/* 打卡进度胶囊：古铜金半透底 + 边框，中央对齐 */
+.header-progress {
+  text-align: center;
+  padding: 10rpx 24rpx;
+  background: rgba(201, 169, 110, 0.15);   /* 古铜金主色 15% 半透底 */
+  border: 1rpx solid rgba(201, 169, 110, 0.4);
+  border-radius: 20rpx;
+}
+
+/* 进度数字：古铜金大号粗体 */
+.progress-num {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #c9a96e;                       /* 古铜金主色：进度数字 */
+}
+
+/* 进度标签：暗金灰小字 */
+.progress-label {
+  display: block;
+  font-size: 20rpx;
+  color: #8a7a5e;                       /* 暗金灰：进度标签 */
+}
+
+/* ==================== 地图滚动区（图片包裹锚定法） ==================== */
+/* 滚动视窗：flex:1 占满剩余空间，height:0 配合 flex 让 scroll-view 自适应 */
+.scroll-area {
+  flex: 1;
+  height: 0;
+  position: relative;
+}
+
+/* 地图包裹层：宽 100%，相对定位 —— 所有热区/NPC 以它为基准用百分比定位，
+   确保不同尺寸机型下热区始终锚定地图正确位置 */
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 底图：widthFix 模式，宽度撑满屏后按图片原始比例自适应高度，保证地图不变形 */
+.base-map {
+  width: 100%;
+  display: block;
+}
+
+/* ==================== 透明打卡热区 ==================== */
+/* 热区通用容器：圆形，百分比绝对定位，z-index 高于底图但低于 NPC */
+.hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);     /* 以自身中心为锚点 */
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  z-index: 15;
+}
+
+/* 未打卡状态：金色呼吸光圈（黄金色 #FFD700 半透），提示用户此处可点 */
+.hz-pending {
+  background: transparent;
+  box-shadow: 0 0 12rpx 4rpx rgba(255, 215, 0, 0.45),
+              0 0 24rpx 8rpx rgba(255, 215, 0, 0.2);
+  animation: hzBreath 2s ease-in-out infinite;
+}
+
+/* 已打卡状态：呼吸停止，中央显示古铜金 ✔ 勾 */
+.hz-checked {
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 已打卡勾号：古铜金粗体 + 弹入动画 */
+.hz-check {
+  font-size: 44rpx;
+  color: #c9a96e;                       /* 古铜金主色：打勾 */
+  font-weight: 700;
+  text-shadow: 0 0 8rpx rgba(201, 169, 110, 0.8), 0 2rpx 4rpx rgba(0, 0, 0, 0.5);
+  animation: hzCheckPop 0.4s ease;
+}
+
+/* 当前选中热区：朱红色加强光晕（比 pending 金色更醒目），提示当前目标 */
+.hz-active {
+  box-shadow: 0 0 16rpx 6rpx rgba(255, 71, 87, 0.6),
+              0 0 32rpx 12rpx rgba(255, 71, 87, 0.25);
+  animation: hzActivePulse 1s ease-in-out infinite;
+}
+
+/* 未打卡呼吸关键帧 */
+@keyframes hzBreath {
+  0%, 100% {
+    box-shadow: 0 0 8rpx 2rpx rgba(255, 215, 0, 0.3),
+                0 0 16rpx 4rpx rgba(255, 215, 0, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 16rpx 6rpx rgba(255, 215, 0, 0.6),
+                0 0 32rpx 10rpx rgba(255, 215, 0, 0.25);
+  }
+}
+
+/* 当前选中脉冲关键帧（比普通呼吸更快更亮） */
+@keyframes hzActivePulse {
+  0%, 100% {
+    box-shadow: 0 0 12rpx 4rpx rgba(255, 71, 87, 0.5),
+                0 0 24rpx 8rpx rgba(255, 71, 87, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20rpx 8rpx rgba(255, 71, 87, 0.7),
+                0 0 40rpx 14rpx rgba(255, 71, 87, 0.3);
+  }
+}
+
+/* 打勾弹出动画：scale 0→1 */
+@keyframes hzCheckPop {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 起点热区：特殊蓝金光圈（区别于普通景点的金色），象征穿越之门 / 任务起点 */
+.hz-start {
+  background: rgba(100, 180, 255, 0.1);
+  box-shadow: 0 0 14rpx 5rpx rgba(100, 180, 255, 0.5),
+              0 0 28rpx 10rpx rgba(201, 169, 110, 0.3);
+  animation: hzStartBreath 2.5s ease-in-out infinite;
+}
+
+/* 起点呼吸关键帧：蓝金双色光晕 */
+@keyframes hzStartBreath {
+  0%, 100% {
+    box-shadow: 0 0 10rpx 3rpx rgba(100, 180, 255, 0.35),
+                0 0 20rpx 6rpx rgba(201, 169, 110, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 18rpx 7rpx rgba(100, 180, 255, 0.65),
+                0 0 36rpx 12rpx rgba(201, 169, 110, 0.3);
+  }
+}
+
+/* ==================== NPC 赵佗角色 ==================== */
+/* NPC 容器：百分比定位（和热区同一坐标系），弹性过渡动画模拟瞬移飞行动画 */
+.npc-character {
+  position: absolute;
+  z-index: 20;                             /* 高于热区，保证不会被光圈盖住 */
+  transform: translate(-50%, -50%);
+  transition: left 0.65s cubic-bezier(0.34, 1.56, 0.64, 1),   /* 带回弹的缓动，轻盈可爱 */
+              top 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;                    /* 不接收点击，点击事件交给底下热区 */
+}
+
+/* NPC 背后金色光晕：古铜金径向渐变呼吸 */
+.npc-aura {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100rpx;
+  height: 100rpx;
+  margin-left: -50rpx;
+  margin-top: -50rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.35) 0%, transparent 70%);
+  animation: auraPulse 2s ease-in-out infinite;
+}
+
+@keyframes auraPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 0.3; }
+}
+
+/* NPC 投影阴影：脚下椭圆黑影，浮动时同步缩放营造「离地感」 */
+.npc-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -16rpx;
+  width: 64rpx;
+  height: 16rpx;
+  margin-left: -32rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  animation: npcShadow 2.5s ease-in-out infinite;
+}
+
+@keyframes npcShadow {
+  0%, 100% { transform: scale(1); opacity: 0.45; }
+  50% { transform: scale(0.75); opacity: 0.25; }
+}
+
+/* NPC 头像本体：圆形 + 古铜金边 + 悬浮上下浮动动画 */
+.npc-img {
+  position: relative;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 3rpx solid #c9a96e;             /* 古铜金主色边框 */
+  box-shadow: 0 4rpx 20rpx rgba(201, 169, 110, 0.55);
+  animation: npcCharFloat 2.5s ease-in-out infinite;
+  display: block;
+}
+
+/* 浮动上下动画：translateY 0↔-12rpx */
+@keyframes npcCharFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12rpx); }
+}
+
+/* NPC 名字标签：黑色胶囊底 + 古铜金字 + 边框，放在头像下方不挡脸 */
+.npc-label-tag {
+  position: absolute;
+  bottom: -30rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18rpx;
+  color: #c9a96e;                         /* 古铜金主色：标签字 */
+  font-weight: 700;
+  padding: 2rpx 12rpx;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 14rpx;
+  white-space: nowrap;
+  letter-spacing: 2rpx;
+  border: 1rpx solid rgba(201, 169, 110, 0.5);
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.6);
+}
+
+/* ==================== 剧情对话框（景点详情层） ==================== */
+/* 对话框本体：fixed 底部悬浮，古铜金边 + 暗木渐变底 + 毛玻璃背景虚化 */
+.story-dialog {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 180rpx;                         /* 留出工具栏高度，不被遮挡 */
+  z-index: 100;
+  background: linear-gradient(180deg, rgba(25, 20, 15, 0.96) 0%, rgba(15, 12, 8, 0.98) 100%);  /* 暗木渐变底 */
+  border: 2rpx solid rgba(201, 169, 110, 0.6);
+  border-radius: 20rpx;
+  box-shadow: 0 8rpx 40rpx rgba(0, 0, 0, 0.7), 0 0 30rpx rgba(201, 169, 110, 0.25);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);   /* 回弹缓动 */
+  overflow: hidden;
+  backdrop-filter: blur(10px);            /* 毛玻璃：让背后地图模糊虚化 */
+}
+
+/* 显示态：正常位置 + 全不透明 */
+.story-show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* 隐藏态：下移 + 缩小 + 透明，点击穿透 */
+.story-hide {
+  opacity: 0;
+  transform: translateY(40rpx) scale(0.95);
+  pointer-events: none;
+}
+
+/* 对话框顶部标题栏：古铜金渐变条带 + 底部分隔线 */
+.dialog-scroll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 24rpx;
+  background: linear-gradient(90deg, rgba(201, 169, 110, 0.2) 0%, transparent 100%);
+  border-bottom: 1rpx solid rgba(201, 169, 110, 0.3);
+}
+
+/* 左右三角形龙纹装饰（用 clip-path 切三角），古铜金填充 */
+.dialog-dragon-left,
+.dialog-dragon-right {
+  width: 24rpx;
+  height: 24rpx;
+  background: #c9a96e;                   /* 古铜金主色：龙纹装饰 */
+  opacity: 0.7;
+}
+
+/* 左三角：朝右（尖端朝中心） */
+.dialog-dragon-left {
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+}
+
+/* 右三角：朝左（尖端朝中心） */
+.dialog-dragon-right {
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* 景点名称标题：居中古铜金粗体 */
+.dialog-spot-name {
+  flex: 1;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #c9a96e;                        /* 古铜金主色：景点名 */
+  letter-spacing: 4rpx;
+}
+
+/* 右上角关闭按钮 ×：灰字圆形，低调不抢戏 */
+.dialog-x {
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 44rpx;
+  text-align: center;
+  font-size: 36rpx;
+  color: #888;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 255, 255, 0.15);
+}
+
+/* 剧情内容区：上下左右留白 */
+.dialog-content {
+  padding: 28rpx 32rpx;
+}
+
+/* 剧情故事文字：宣纸浅色 + 楷体，叙事正文 */
+.dialog-story-text {
+  font-size: 28rpx;
+  color: #e8dcc0;                        /* 宣纸浅色字：故事正文 */
+  line-height: 1.85;
+  letter-spacing: 2rpx;
+  font-family: "KaiTi", "STKaiti", serif;
+}
+
+/* 底部操作按钮栏：两列等宽 */
+.dialog-footer {
+  display: flex;
+  gap: 20rpx;
+  padding: 0 28rpx 28rpx;
+}
+
+/* 通用操作按钮：等高度 + 圆角 12rpx */
+.dialog-action-btn {
+  flex: 1;
+  height: 76rpx;
+  line-height: 76rpx;
+  font-size: 28rpx;
+  border-radius: 12rpx;
+  border: none;
+  letter-spacing: 4rpx;
+  padding: 0;
+}
+
+.dialog-action-btn::after { border: none; }
+
+/* 主按钮（与赵佗对话）：古铜金渐变 + 暗木反字，视觉主操作 */
+.dialog-action-btn.primary {
+  background: linear-gradient(135deg, #c9a96e 0%, #8b6914 100%);   /* 古铜金立体渐变 */
+  color: #1a1410;                         /* 暗木色反字 */
+  font-weight: 700;
+  box-shadow: 0 4rpx 16rpx rgba(201, 169, 110, 0.45);
+}
+
+/* 次按钮（关闭）：半透明白底 + 灰字，弱化次操作 */
+.dialog-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+  border: 1rpx solid rgba(255, 255, 255, 0.15);
+}
+
+/* ==================== 右下角悬浮工具栏 ==================== */
+/* 工具栏容器：纵向排列，fixed 定位右下角（底部留 180rpx 和剧情弹窗保持一致） */
+.floating-toolbar {
+  position: fixed;
+  right: 24rpx;
+  bottom: 180rpx;
+  z-index: 200;                            /* 高于剧情弹窗，随时可点 */
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+/* 单个工具按钮：方形圆角 + 暗木渐变底 + 古铜金边，按下有缩小反馈 */
+.tool-btn {
+  width: 110rpx;
+  height: 110rpx;
+  background: linear-gradient(145deg, rgba(40, 30, 20, 0.95) 0%, rgba(25, 20, 15, 0.98) 100%);
+  border: 2rpx solid rgba(201, 169, 110, 0.5);
+  border-radius: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.6), inset 0 1rpx 0 rgba(201, 169, 110, 0.15);  /* inset 高光：内浮雕感 */
+  transition: all 0.25s;
+}
+
+.tool-btn:active {
+  transform: scale(0.92);
+  box-shadow: 0 3rpx 10rpx rgba(0, 0, 0, 0.4);
+}
+
+/* 悬停/按下高亮态（微信 hover-class）：古铜金底 + 实色边 */
+.tool-hover {
+  background: linear-gradient(145deg, rgba(201, 169, 110, 0.25) 0%, rgba(139, 105, 20, 0.2) 100%);
+  border-color: #c9a96e;
+}
+
+/* 工具图标（emoji）：大字号 */
+.tool-icon {
+  font-size: 44rpx;
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+
+/* 工具标签：古铜金小字 */
+.tool-label {
+  font-size: 20rpx;
+  color: #c9a96e;                        /* 古铜金主色：工具标签 */
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+/* 特殊按钮 —— 拍卡打卡：朱红色渐变（警示色，核心功能之一） */
+.tool-photo {
+  background: linear-gradient(145deg, rgba(192, 57, 43, 0.85) 0%, rgba(139, 35, 24, 0.9) 100%);
+  border-color: #ff4757;
+}
+
+.tool-photo .tool-label {
+  color: #ffd0d0;                         /* 淡红字：和红色按钮形成对比 */
+}
+
+/* 特殊按钮 —— 自由闲聊：微信绿渐变（呼应小程序生态色） */
+.tool-chat {
+  background: linear-gradient(145deg, rgba(7, 193, 96, 0.85) 0%, rgba(6, 173, 86, 0.9) 100%);
+  border-color: #07C160;
+}
+
+.tool-chat .tool-label {
+  color: #d0ffd0;                         /* 淡绿字 */
+}
+
+/* 功能分组分隔线：古铜金渐变线，区分「拍照/打卡」和「主页/进度」两组功能 */
+.tool-divider {
+  height: 2rpx;
+  width: 60rpx;
+  margin: 6rpx auto;
+  background: linear-gradient(90deg, transparent, rgba(201, 169, 110, 0.6), transparent);
+}
+
+/* 进度按钮标签：古铜金胶囊底白字，突出进度数字 */
+.tool-progress .tool-label {
+  color: #fff;
+  background: rgba(201, 169, 110, 0.3);
+  padding: 2rpx 10rpx;
+  border-radius: 10rpx;
+  font-size: 22rpx;
+}
+
+/* ==================== 起点剧情弹窗（赵佗虚影独白 + 打字机） ==================== */
+/* 全屏遮罩：居中放置赵佗虚影 + 长对白 + 领命出发按钮 */
+.start-popup-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 500;                            /* 高于工具栏和剧情弹窗，低于静音按钮 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+}
+
+/* 显示态 */
+.start-show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 隐藏态 */
+.start-hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 遮罩背景（用 ::before 伪元素实现，避免盖住子节点 pointer）：中心亮→四周暗 */
+.start-popup-mask::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(20, 15, 10, 0.85) 0%, rgba(0, 0, 0, 0.97) 70%);
+}
+
+/* 弹窗面板：圆角卡片，暗木底 + 古铜金边 + 双层阴影 */
+.start-popup-panel {
+  position: relative;
+  width: 620rpx;
+  padding: 50rpx 40rpx 40rpx;
+  background: linear-gradient(180deg, rgba(25, 20, 15, 0.98) 0%, rgba(15, 12, 8, 0.99) 100%);
+  border: 2rpx solid rgba(201, 169, 110, 0.5);
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 60rpx rgba(0, 0, 0, 0.8), 0 0 40rpx rgba(201, 169, 110, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 弹窗头部：头像 + 赵佗虚影名 */
+.start-popup-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+/* 赵佗虚影头像：圆形 + 古铜金半透边（半透暗示「虚影」非实体） */
+.start-popup-avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(201, 169, 110, 0.7);
+  box-shadow: 0 4rpx 24rpx rgba(201, 169, 110, 0.4);
+  position: relative;
+  z-index: 2;
+}
+
+/* 头像外蓝色光晕（区别于开场的纯古铜金光晕，此为蓝光，暗示虚影/神话感） */
+.start-popup-glow {
+  position: absolute;
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100, 180, 255, 0.25) 0%, transparent 70%);
+  animation: startGlow 2.5s ease-in-out infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+/* 蓝光晕呼吸关键帧 */
+@keyframes startGlow {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* 「赵佗虚影」标题字：古铜金粗体宽字距 */
+.start-popup-name {
+  margin-top: 16rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #c9a96e;                        /* 古铜金主色：虚影名 */
+  letter-spacing: 8rpx;
+  text-shadow: 0 0 16rpx rgba(201, 169, 110, 0.4);
+}
+
+/* 剧情正文容器：固定最小/最大高度，内容超出可滚动 */
+.start-popup-body {
+  width: 100%;
+  padding: 24rpx 28rpx;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1rpx solid rgba(201, 169, 110, 0.25);
+  border-radius: 12rpx;
+  min-height: 300rpx;
+  max-height: 500rpx;
+}
+
+/* 剧情文字：宣纸浅色 + 楷体 */
+.start-popup-text {
+  font-size: 28rpx;
+  color: #e8dcc0;                        /* 宣纸浅色字：正文 */
+  line-height: 1.7;
+  letter-spacing: 2rpx;
+  font-family: "KaiTi", "STKaiti", serif;
+}
+
+/* 起点剧情打字机光标：古铜金竖线（和开场光标复用 blink 动画） */
+.start-cursor {
+  display: inline;
+  color: #c9a96e;                        /* 古铜金主色：光标 */
+  animation: cursorBlink 0.8s step-end infinite;
+  font-weight: 700;
+}
+
+/* 底部按钮容器：淡入动画，打字完成后才出现 */
+.start-popup-footer {
+  margin-top: 30rpx;
+  animation: btnFadeIn 0.5s ease;
+}
+
+/* 「领命出发」主按钮：古铜金渐变（和开场按钮同风格，略小） */
+.start-popup-btn {
+  width: 300rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: linear-gradient(135deg, #c9a96e 0%, #8b6914 50%, #c9a96e 100%);   /* 古铜金立体渐变 */
+  color: #1a1410;                         /* 暗木色反字 */
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 10rpx;
+  border-radius: 44rpx;
+  border: 2rpx solid #e8d5a0;
+  box-shadow: 0 4rpx 20rpx rgba(201, 169, 110, 0.5);
+  position: relative;
+  padding: 0;
+}
+
+.start-popup-btn::after { border: none; }
+
+.start-btn-text { position: relative; z-index: 2; }
+
+/* 按钮外层古铜金发光晕（复用 btnGlow 动画） */
+.start-btn-glow {
+  position: absolute;
+  inset: -8rpx;
+  border-radius: 50rpx;
+  background: radial-gradient(ellipse at center, rgba(201, 169, 110, 0.35) 0%, transparent 70%);
+  animation: btnGlow 2s ease-in-out infinite;
+  pointer-events: none;
+}

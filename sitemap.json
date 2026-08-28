@@ -1,0 +1,9 @@
+{
+  "_comment": "========================================================================\n  小程序搜索引擎索引配置 (Sitemap)\n  参考文档: https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/sitemap.html\n========================================================================\n\n  【当前策略】\n  所有页面均允许被微信搜索引擎索引 (action: allow, page: *)。\n  若后续需隐藏某些调试/内部页面，可在此处追加规则。\n========================================================================",
+
+  "desc": "关于本文件的更多信息，请参考文档 https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/sitemap.html",
+  "rules": [{
+    "action": "allow",
+    "page": "*"
+  }]
+}

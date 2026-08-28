@@ -1,0 +1,694 @@
+<!-- ==========================================================================
+     拓拓 AI 助手 · 聊天页 WXML 结构说明
+     页面根容器：chat-container（全屏 100% 覆盖）
+     子模块从上到下依次：
+       1. 全屏古风背景图层（不响应交互 pointer-events:none）
+       2. 右上角静音切换按钮（铃铛图标，绑定 data.isMuted）
+       3. 悬浮调试 FAB + 日志面板（当前 wx:if=false 禁用，保留结构）
+       4. 聊天消息滚动区（scroll-view scroll-y 无 scroll-with-animation 防渲染抖动）
+       5. 扫码打卡悬浮按钮（右下角，点击弹景点选择/扫一扫）
+       6. 底部输入栏（相机 + 输入框 + 发送按钮，isSending 时禁用）
+       7. 过渡弹窗（showTransitionPopup：判卷后双按钮闲聊/移步）
+       8. 景点介绍弹窗（showSpotIntro：卷轴风移步下一景点介绍）
+       9. 越王令奖励弹窗（showTokenPopup：越王井答对后道具）
+       10. 龙川考棚科举流程 6 弹窗（showKejuStart / showKejuIntro /
+           showKejuXiangshi / showKejuHuishi / showKejuDianshi / showKejuResult）
+       11. 越王庙谒王访贤任务 3 弹窗（showTempleTask / showTempleQuiz / showTempleResult）
+       12. 正相塔大结局弹窗（showEnding：score>=5 选 ENDING_A 否则 ENDING_B）
+     所有弹窗 mask 均 catchtouchmove="noop" 防止 iOS 橡皮筋滚动穿透。
+     ========================================================================== -->
+<view class="chat-container">
+  <!-- 全屏背景图（古风暗金第一章背景，独立图层 pointer-events: none 不拦截点击） -->
+  <view class="chat-bg">
+    <image src="/images/chat-bg-ancient.jpg" mode="aspectFill" />
+  </view>
+
+  <!-- ==========================================================
+       模块2：右上角静音按钮（铃铛图标）
+       绑定状态：data.isMuted（布尔）
+       - !isMuted → 显示 3 道声波 + 铃铛（mute-icon-sound）
+       - isMuted  → 上述 + 红色斜杠（mute-icon-mute）
+       事件：bindtap=toggleMute；catchtouchmove=noop 防止滑动触发
+       ========================================================== -->
+  <view class="mute-btn" bindtap="toggleMute" catchtouchmove="noop">
+    <view wx:if="{{!isMuted}}" class="mute-icon-sound">
+      <view class="sound-wave w1"></view>
+      <view class="sound-wave w2"></view>
+      <view class="sound-wave w3"></view>
+      <view class="sound-bell"></view>
+    </view>
+    <view wx:else class="mute-icon-mute">
+      <view class="sound-wave w1"></view>
+      <view class="sound-wave w2"></view>
+      <view class="sound-wave w3"></view>
+      <view class="sound-bell"></view>
+      <view class="sound-slash"></view>
+    </view>
+  </view>
+
+  <!-- ==========================================================
+       模块3：悬浮调试 FAB + 日志面板（当前 wx:if="{{false}}" 结构保留但整体禁用）
+       FAB：左上角红色圆形"调试"按钮，debugLogs.length>0 时亮黄色呼吸灯点
+       面板：遮罩层 + 卷轴风面板 + 报告区 + 日志逐条列表 + 「一键复制全部日志」
+       绑定状态：
+         - showDebugPanel：是否展开调试面板（当前因外层 false 整体不显示）
+         - debugLogs[]：每条 {time, timeStr, tag, content} 错误日志
+         - autoTestReport：自动化闪退诊断报告文本（可长按 selectable 复制）
+       ========================================================== -->
+  <view wx:if="{{false}}" class="debug-fab" bindtap="toggleDebugPanel" catchtouchmove="noop">
+    <view class="debug-fab-text">调试</view>
+    <view wx:if="{{debugLogs.length > 0}}" class="debug-fab-dot"></view>
+  </view>
+  <view wx:if="{{showDebugPanel && false}}" class="debug-panel-mask" bindtap="toggleDebugPanel" catchtouchmove="noop"></view>
+  <view wx:if="{{showDebugPanel && false}}" class="debug-panel" catchtouchmove="noop">
+    <view class="debug-panel-header">
+      <text class="debug-panel-title">最近错误日志（闪退前可复制给开发者）</text>
+      <view class="debug-panel-close" bindtap="toggleDebugPanel">×</view>
+    </view>
+    <scroll-view class="debug-panel-body" scroll-y>
+      <view wx:if="{{autoTestReport}}" class="autotest-report">
+        <view class="autotest-report-title">📊 自动化闪退诊断报告</view>
+        <text user-select="{{true}}" selectable="{{true}}" class="autotest-report-text">{{autoTestReport}}</text>
+      </view>
+      <view wx:if="{{debugLogs.length === 0}}" class="debug-panel-empty">暂无错误，一切正常 ✅</view>
+      <block wx:for="{{debugLogs}}" wx:key="time" wx:for-item="log">
+        <view class="debug-log-item">
+          <view class="debug-log-time">[{{log.timeStr}}] ⚠ {{log.tag}}</view>
+          <text user-select="{{true}}" selectable="{{true}}" class="debug-log-content">{{log.content}}</text>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="debug-panel-footer" bindtap="copyDebugLogs">📋 一键复制全部日志</view>
+  </view>
+
+  <!-- ==========================================================
+       模块4：聊天消息滚动区（核心）
+       scroll-view 关键配置（防抖动/防闪退的关键）：
+         - scroll-with-animation="{{false}}"：禁用滚动动画，避免与
+           打字机 setData 更新 displayText 同时触发渲染冲突
+         - enhanced="{{true}}"：启用新版增强 scroll-view 性能
+         - show-scrollbar="{{false}}"：隐藏滚动条 UI
+         - scroll-into-view="{{scrollToView}}"：锚点跳转由 JS 控制
+       渲染说明：
+         - wx:for messages 数组，msg.id 作为 key
+         - 消息过滤：msg.isHidden===true（系统指令/扫码隐藏消息）直接跳过不渲染
+         - user 消息：右头像 + 微信绿气泡（#07C160），可带图片（msg.imagePath）
+         - bot  消息：左赵佗头像 + 深棕古风气泡，显示 msg.displayText（打字机）
+                      msg.typewriting=true 显示竖线光标
+                      msg.typing=true 显示"..."动画（AI 思考中占位）
+       ========================================================== -->
+  <scroll-view
+    class="chat-scroll"
+    scroll-y
+    scroll-into-view="{{scrollToView}}"
+    scroll-with-animation="{{false}}"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+  >
+    <view class="message-list">
+      <block wx:for="{{messages}}" wx:key="id" wx:for-item="msg">
+        <view wx:if="{{!msg.isHidden}}" id="msg-{{msg.id}}" class="message-item {{msg.from === 'user' ? 'message-user' : 'message-bot'}}">
+          <block wx:if="{{msg.from === 'user'}}">
+            <image class="avatar user-avatar" src="/images/user-avatar.png" />
+            <view class="message-bubble user-bubble">
+              <image wx:if="{{msg.imagePath}}" class="msg-image" src="{{msg.imagePath}}" mode="widthFix" />
+              <text wx:if="{{msg.content}}" class="message-text">{{msg.content}}</text>
+            </view>
+          </block>
+          <block wx:else>
+            <image class="avatar bot-avatar" src="/images/bot-avatar.png" />
+            <view class="message-bubble bot-bubble">
+              <text class="message-text">{{msg.displayText}}</text>
+              <text wx:if="{{msg.typewriting}}" class="msg-cursor">|</text>
+              <view wx:if="{{msg.typing}}" class="typing-dots">
+                <view class="dot dot1"></view>
+                <view class="dot dot2"></view>
+                <view class="dot dot3"></view>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <!-- ==========================================================
+       模块5：扫码打卡悬浮按钮（右下角 FAB）
+       事件：catchtap=onScanCheckIn → 先弹景点选择（手动选）或直接调
+             wx.scanCode onlyFromCamera:false 支持相册扫码
+       hover-class：scan-fab-hover 点击缩放反馈
+       ========================================================== -->
+  <view class="scan-fab" catchtap="onScanCheckIn" hover-class="scan-fab-hover">
+    <text class="scan-fab-icon">📷</text>
+    <text class="scan-fab-text">扫码打卡</text>
+  </view>
+
+  <!-- ==========================================================
+       模块6：底部输入栏（相机按钮 + 输入框 + 发送按钮）
+       绑定状态：
+         - inputValue：文本内容（bindinput=onInput）
+         - isSending：AI 回复中 → 输入框 & 发送按钮全部 disabled
+       子组件：
+         6a. 📷 相机按钮 → onChooseImage 调 wx.chooseMedia 图片发送（越王井看图）
+         6b. message-input → confirm-type=send 键盘发送=bindconfirm=onSend
+         6c. send-btn → 有 inputValue 且 !isSending 才变绿可点
+       ========================================================== -->
+  <view class="input-bar">
+    <view class="camera-btn" bindtap="onChooseImage" hover-class="camera-btn-hover">
+      <text class="camera-icon">📷</text>
+    </view>
+    <view class="input-wrapper">
+      <input
+        class="message-input"
+        value="{{inputValue}}"
+        placeholder="请输入消息..."
+        placeholder-class="input-placeholder"
+        confirm-type="send"
+        adjust-position="true"
+        bindinput="onInput"
+        bindconfirm="onSend"
+        disabled="{{isSending}}"
+      />
+    </view>
+    <button
+      class="send-btn {{inputValue ? 'send-btn-active' : ''}}"
+      bindtap="onSend"
+      disabled="{{!inputValue || isSending}}"
+    >
+      发送
+    </button>
+  </view>
+
+  <!-- ==========================================================
+       模块7：过渡弹窗（判卷完成后双按钮选择）
+       绑定状态：data.showTransitionPopup === true 时显示
+       触发时机：AI 判卷回复 + 打字机 & TTS 都完成 → checkTransitionAndShow
+                → _appendTransitionAndPopup 追加 SPOT_FLOW 硬编码过渡台词
+                → 打字完成后再延迟 2 秒才弹出本弹窗
+       关联字段：
+         - nextSpotName：下一站景点中文名（来自 SPOT_FLOW[xxx].nextLabel）
+       两个按钮：
+         - onStayAtSpot：关闭弹窗，用户继续在当前景点闲聊
+         - onGoToNextSpot：关闭弹窗 → 打卡下一景点 → 弹景点介绍弹窗（模块8）
+       ========================================================== -->
+  <view wx:if="{{showTransitionPopup}}" class="transition-mask" catchtouchmove="noop">
+    <view class="transition-dialog">
+      <view class="td-header">
+        <image class="td-avatar" src="/images/zhaotuo-avatar.png" />
+        <view class="td-npc-glow"></view>
+        <view class="td-title">赵佗虚影</view>
+      </view>
+      <view class="td-actions">
+        <view class="td-btn td-btn-stay" bindtap="onStayAtSpot">
+          <text class="td-btn-icon">🗣️</text>
+          <text class="td-btn-label">继续在此闲聊</text>
+        </view>
+        <view class="td-btn td-btn-go" bindtap="onGoToNextSpot">
+          <text class="td-btn-icon">🏯</text>
+          <text class="td-btn-label">移步{{nextSpotName}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ==========================================================
+       模块8：景点介绍弹窗（移步下一景点时的卷轴风介绍）
+       绑定状态：data.showSpotIntro === true 时显示
+       触发时机：模块7 用户点击「移步XXX」→ onGoToNextSpot → SPOT_INTROS 查表
+                → 若无介绍（正相塔）直接 triggerSpotVisit，否则弹本窗
+       关联字段：
+         - introSpotName       ：景点大字名（越王庙/越王井/考棚/苏堤/正相塔）
+         - introSpotSubtitle   ：副标题小字（一句话标签）
+         - introTypewriterText ：介绍正文（80ms/字打字机，比聊天的235ms快）
+         - introTyping         ：打字中 → 显示竖线光标 |
+         - showIntroBtn        ：打字完成 → 显示「进入景点」按钮（onEnterSpot）
+       ========================================================== -->
+  <view wx:if="{{showSpotIntro}}" class="intro-mask" catchtouchmove="noop">
+    <view class="intro-panel">
+      <view class="intro-scroll-decoration top"></view>
+      <view class="intro-scroll-decoration bottom"></view>
+      <view class="intro-avatar-wrap">
+        <image class="intro-avatar" src="/images/zhaotuo-avatar.png" />
+        <view class="intro-glow"></view>
+      </view>
+      <view class="intro-spot-name">{{introSpotName}}</view>
+      <view class="intro-spot-subtitle">{{introSpotSubtitle}}</view>
+      <view class="intro-dialog-box">
+        <text class="intro-dialog-text">{{introTypewriterText}}</text>
+        <text wx:if="{{introTyping}}" class="intro-cursor">|</text>
+      </view>
+      <view wx:if="{{showIntroBtn}}" class="intro-btn-wrap">
+        <button class="intro-enter-btn" bindtap="onEnterSpot">
+          <view class="btn-glow"></view>
+          <text class="btn-text">进入景点</text>
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- ==========================================================
+       模块9：越王令奖励弹窗（越王井答对任意一题时弹出）
+       绑定状态：data.showTokenPopup === true 时显示
+       触发时机：AI 回复中检测到【TOKEN_AWARDED】中文字符标记
+                → cleanBotText 正则移除标记 → checkTransitionAndShow
+                → 延迟弹本窗（越王令奖励）
+       核心按钮：onAcceptToken → 关闭本窗 + 500ms 后追加过渡台词走过渡流程
+       ========================================================== -->
+  <view wx:if="{{showTokenPopup}}" class="token-mask" catchtouchmove="noop">
+    <view class="token-panel">
+      <view class="token-scroll-deco top"></view>
+      <view class="token-scroll-deco bottom"></view>
+      <view class="token-glow-ring"></view>
+      <image class="token-image" src="/images/yuewangling.png" mode="aspectFit" />
+      <view class="token-title">越 王 令</view>
+      <view class="token-subtitle">岭南第一井 · 功勋凭证</view>
+      <view class="token-desc">
+        <text class="token-desc-text">恭喜你答对越王井考题，获赐越王令一枚！</text>
+        <text class="token-desc-sub">此令为佗城守护之灵所认，持之可通南越千年文脉。</text>
+      </view>
+      <view class="token-btn-wrap">
+        <view class="token-accept-btn" bindtap="onAcceptToken">
+          <text class="token-accept-text">🜲 接 受</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============================================================
+       模块10：龙川考棚 · 科举流程 6 个弹窗（共用 keju-mask/keju-panel 壳子）
+       6 个弹窗互斥，同一时刻只 show* 其中一个，状态机顺序：
+       showKejuStart → showKejuIntro → showKejuXiangshi → showKejuHuishi
+                   → showKejuDianshi → showKejuResult → onKejuResultDone 过渡苏堤
+       ============================================================ -->
+
+  <!-- 弹窗1：科举之邀（入场欢迎）
+       绑定：data.showKejuStart
+       触发：triggerSpotVisit('keju') / onScanCheckIn 识别考棚
+       按钮：
+         onKejuRefuse  → 关闭 + AI 说出 "无妨..." 台词 + 2秒→过渡跳过
+         onKejuAccept  → 切到弹窗2 showKejuIntro -->
+  <view wx:if="{{showKejuStart}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-glow"></view>
+      <view class="keju-avatar-wrap">
+        <image class="keju-avatar" src="/images/zhaotuo-avatar.png" />
+      </view>
+      <view class="keju-main-title">科 举 之 邀</view>
+      <view class="keju-start-desc">
+        <text class="keju-start-text">今日龙川考棚，本王亲设科举三关。</text>
+        <text class="keju-start-text">乡试 · 会试 · 殿试，层层而上！</text>
+        <text class="keju-start-text">学子可有胆气，入闱一试？</text>
+      </view>
+      <view class="keju-actions two-col">
+        <view class="keju-btn keju-btn-secondary" bindtap="onKejuRefuse">
+          <text class="keju-btn-text">算了，不敢</text>
+        </view>
+        <view class="keju-btn keju-btn-primary" bindtap="onKejuAccept">
+          <text class="keju-btn-text">那有啥，接了！</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗2：科举任务介绍（三关流程可视化）
+       绑定：data.showKejuIntro
+       触发：onKejuAccept → true
+       展示：壹(乡试·选择) → 贰(会试·填空) → 叁(殿试·主观) 流程线
+       按钮：onKejuIntroStart → 切到弹窗3 showKejuXiangshi -->
+  <view wx:if="{{showKejuIntro}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-intro-badge">任 务</view>
+      <view class="keju-intro-title">金 榜 题 名</view>
+      <view class="keju-intro-divider"></view>
+      <view class="keju-intro-content">
+        <text class="keju-intro-line">进入考间，完成科举模拟考试。</text>
+        <text class="keju-intro-line">闯过三关，赢取赵佗亲赐称号！</text>
+      </view>
+      <view class="keju-intro-stages">
+        <view class="stage-item">
+          <text class="stage-num">壹</text>
+          <text class="stage-name">乡试</text>
+          <text class="stage-hint">选择题</text>
+        </view>
+        <view class="stage-arrow">→</view>
+        <view class="stage-item">
+          <text class="stage-num">贰</text>
+          <text class="stage-name">会试</text>
+          <text class="stage-hint">填空题</text>
+        </view>
+        <view class="stage-arrow">→</view>
+        <view class="stage-item">
+          <text class="stage-num">叁</text>
+          <text class="stage-name">殿试</text>
+          <text class="stage-hint">主观题</text>
+        </view>
+      </view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onKejuIntroStart">
+          <text class="keju-btn-text">进 入 考 间</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗3：第一关 · 乡试（三选一选择题）
+       绑定：data.showKejuXiangshi
+       题干：佗城考棚建于哪一年？ 正确答案 B=光绪二年
+       关联字段：kejuXiangshiAnswer ∈ {A,B,C}，选中项加 .selected 高亮
+       选项事件：onXiangshiSelect data-key=A/B/C
+       提交按钮：onXiangshiSubmit → 判卷 → 对则切弹窗4，错也继续切 -->
+  <view wx:if="{{showKejuXiangshi}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-stage-tag">第一关 · 乡 试</view>
+      <view class="keju-question">佗城考棚建于哪一年？</view>
+      <view class="keju-options">
+        <view
+          class="keju-option {{kejuXiangshiAnswer === 'A' ? 'selected' : ''}}"
+          data-key="A"
+          bindtap="onXiangshiSelect"
+        >
+          <text class="opt-key">A</text>
+          <text class="opt-text">乾隆年间</text>
+        </view>
+        <view
+          class="keju-option {{kejuXiangshiAnswer === 'B' ? 'selected' : ''}}"
+          data-key="B"
+          bindtap="onXiangshiSelect"
+        >
+          <text class="opt-key">B</text>
+          <text class="opt-text">光绪二年</text>
+        </view>
+        <view
+          class="keju-option {{kejuXiangshiAnswer === 'C' ? 'selected' : ''}}"
+          data-key="C"
+          bindtap="onXiangshiSelect"
+        >
+          <text class="opt-key">C</text>
+          <text class="opt-text">道光年间</text>
+        </view>
+      </view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onXiangshiSubmit">
+          <text class="keju-btn-text">确 认 答 案</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗4：第二关 · 会试（填空题）
+       绑定：data.showKejuHuishi
+       题干："出类拔萃者谁非白衣卿相"的上半句是什么？
+       提示：学而优则仕 · 不分寒门士族
+       正确关键字：学而优则仕 + 寒门/士族（两者任一）
+       关联字段：kejuHuishiAnswer 双向绑定 bindinput=onHuishiInput
+       提交按钮：onHuishiSubmit → 判卷 → 切弹窗5 殿试 -->
+  <view wx:if="{{showKejuHuishi}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-stage-tag">第二关 · 会 试</view>
+      <view class="keju-question">考棚大门对联中"出类拔萃者谁非白衣卿相"的上半句是什么？</view>
+      <view class="keju-input-wrap">
+        <input
+          class="keju-input"
+          value="{{kejuHuishiAnswer}}"
+          placeholder="请填入上半句对联..."
+          placeholder-class="keju-input-placeholder"
+          bindinput="onHuishiInput"
+          confirm-type="done"
+        />
+      </view>
+      <view class="keju-hint">提示：学而优则仕 · 不分寒门士族</view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onHuishiSubmit">
+          <text class="keju-btn-text">提 交 试 卷</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗5：第三关 · 殿试（主观论述，500字 max）
+       绑定：data.showKejuDianshi
+       题干：如果你是赵佗，如何治理岭南？
+       评分依据 DIANSHI_CRITERIA 4 类别关键字命中数：
+         和辑百越 / 中原技术 / 移民实边 / 两度归汉
+       关联字段：
+         kejuDianshiAnswer 长文本（bindinput=onDianshiInput maxlength=500）
+         kejuDianshiAnswer.length 右下角字数统计
+       提交按钮：onDianshiSubmit → _scoreDianshiAnswer 给分(0~4)
+              → _getKejuAwardTitle 状元/进士/贡士/举人
+              → DIANSHI_SCORED_REPLIES 取结果文案
+              → 切弹窗6 showKejuResult -->
+  <view wx:if="{{showKejuDianshi}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel keju-panel-large">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-stage-tag">第三关 · 殿 试</view>
+      <view class="keju-question">如果你是赵佗，如何治理岭南？</view>
+      <view class="keju-textarea-wrap">
+        <textarea
+          class="keju-textarea"
+          value="{{kejuDianshiAnswer}}"
+          placeholder="请在此发表你的治国之策...（字数建议100字以上）"
+          placeholder-class="keju-input-placeholder"
+          bindinput="onDianshiInput"
+          maxlength="500"
+          auto-height="{{true}}"
+        />
+        <view class="keju-word-count">{{kejuDianshiAnswer.length}} / 500</view>
+      </view>
+      <view class="keju-hint">参考要点：和辑百越 · 中原技术 · 移民实边 · 两度归汉</view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onDianshiSubmit">
+          <text class="keju-btn-text">呈 给 陛 下</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗6：科举评分 + 结果称号 + 打字机（第三关结果）
+       绑定：data.showKejuResult
+       展示内容：
+         kejuAwardTitle  ：状元/进士/贡士/举人（大号字）
+         kejuAwardText   ：副标题描述
+         kejuScore.q1    ：乡试对错 乡点亮起
+         kejuScore.q2    ：会试对错 会点亮起
+         kejuScore.dianshiLevel>=2 ：殿试合格 殿点亮起
+         kejuResultText  ：赵佗点评文案（打字机 kejuResultTyping=true 光标）
+       提交按钮：onKejuResultDone → 走过渡到下一站苏堤 -->
+  <view wx:if="{{showKejuResult}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel keju-panel-large">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-result-glow"></view>
+      <view class="keju-result-rank-big">{{kejuAwardTitle}}</view>
+      <view class="keju-result-rank-sub">{{kejuAwardText}}</view>
+      <view class="keju-result-score-bar">
+        <text class="score-dot {{kejuScore.q1 ? 'on' : ''}}">乡</text>
+        <text class="score-dot {{kejuScore.q2 ? 'on' : ''}}">会</text>
+        <text class="score-dot {{kejuScore.dianshiLevel >= 2 ? 'on' : ''}}">殿</text>
+      </view>
+      <view class="keju-result-bubble">
+        <text class="result-text">{{kejuResultText}}</text>
+        <text wx:if="{{kejuResultTyping}}" class="msg-cursor">|</text>
+      </view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onKejuResultDone">
+          <text class="keju-btn-text">传 承 文 脉</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============================================================
+       模块11：越王庙「谒王访贤」任务 3 弹窗
+       状态机顺序：showTempleTask → showTempleQuiz → showTempleResult
+                 → onTempleResultClose → 过渡到越王井
+       ============================================================ -->
+
+  <!-- 弹窗A：任务介绍（三道题目预览 + 双按钮接受/放弃）
+       绑定：data.showTempleTask
+       触发：triggerSpotVisit('temple') / 扫码识别越王庙
+       内容：3 道问答题条目列表 + 💡场区有答案提示
+       按钮：
+         onTempleTaskDecline → 关闭 + AI 说台词 + 2秒→过渡越王井
+         onTempleTaskAccept  → 切弹窗B showTempleQuiz -->
+  <view wx:if="{{showTempleTask}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-glow"></view>
+      <view class="keju-intro-badge">任 务</view>
+      <view class="keju-intro-title temple-title">谒 王 访 贤</view>
+      <view class="keju-intro-divider"></view>
+      <view class="temple-questions">
+        <view class="temple-question-item">
+          <text class="temple-q-num">壹</text>
+          <text class="temple-q-text">这座庙是谁建的？</text>
+        </view>
+        <view class="temple-question-item">
+          <text class="temple-q-num">贰</text>
+          <text class="temple-q-text">赵佗的塑像是什么材质的？</text>
+        </view>
+        <view class="temple-question-item">
+          <text class="temple-q-num">叁</text>
+          <text class="temple-q-text">这里供奉着几位贤士？他们分别是谁？（说出两位即可）</text>
+        </view>
+      </view>
+      <view class="temple-hint-wrap">
+        <text class="temple-hint">💡 场区内有答案，可以先去浏览、寻找一番~</text>
+      </view>
+      <view class="keju-actions two-col">
+        <view class="keju-btn keju-btn-secondary" bindtap="onTempleTaskDecline">
+          <text class="keju-btn-text">不太会，下次吧</text>
+        </view>
+        <view class="keju-btn keju-btn-primary" bindtap="onTempleTaskAccept">
+          <text class="keju-btn-text">有手就行！</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗B：作答弹窗（3 道题同时作答，每题 input）
+       绑定：data.showTempleQuiz
+       关联字段：
+         templeAnswer1 第一题 bindinput=onTempleInput1
+         templeAnswer2 第二题 bindinput=onTempleInput2
+         templeAnswer3 第三题 bindinput=onTempleInput3
+       评分标准（_judgeTempleAnswers）：
+         Q1 正确关键字：百姓/佗城/民
+         Q2 正确关键字：木雕 且 彩绘 两者都要有
+         Q3 正确关键字：十 + 说出至少 2 位贤士名字（苏辙/吴潜/周敦颐等）
+       提交按钮：onTempleQuizSubmit → 判卷 → 切弹窗C showTempleResult -->
+  <view wx:if="{{showTempleQuiz}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel keju-panel-large">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-intro-badge">答 题</view>
+      <view class="keju-intro-title temple-title">谒 王 访 贤</view>
+      <view class="keju-intro-divider"></view>
+      <view class="temple-quiz-section">
+        <!-- 第一题（Q1：建庙者）关键字：百姓/佗城/民 -->
+        <view class="temple-quiz-item">
+          <view class="temple-quiz-question">壹、这座庙是谁建的？</view>
+          <view class="temple-input-wrap">
+            <input
+              class="temple-input"
+              value="{{templeAnswer1}}"
+              placeholder="请输入你的答案..."
+              placeholder-class="keju-input-placeholder"
+              bindinput="onTempleInput1"
+              confirm-type="next"
+            />
+          </view>
+        </view>
+        <!-- 第二题（Q2：材质）关键字：木雕 + 彩绘（双关键字都要） -->
+        <view class="temple-quiz-item">
+          <view class="temple-quiz-question">贰、赵佗的塑像是什么材质的？</view>
+          <view class="temple-input-wrap">
+            <input
+              class="temple-input"
+              value="{{templeAnswer2}}"
+              placeholder="请输入你的答案..."
+              placeholder-class="keju-input-placeholder"
+              bindinput="onTempleInput2"
+              confirm-type="next"
+            />
+          </view>
+        </view>
+        <!-- 第三题（Q3：贤士）关键字：十 + 至少2位名字 -->
+        <view class="temple-quiz-item">
+          <view class="temple-quiz-question">叁、这里供奉着几位贤士？他们分别是谁？（说出两位即可）</view>
+          <view class="temple-input-wrap">
+            <input
+              class="temple-input"
+              value="{{templeAnswer3}}"
+              placeholder="请输入你的答案..."
+              placeholder-class="keju-input-placeholder"
+              bindinput="onTempleInput3"
+              confirm-type="done"
+            />
+          </view>
+        </view>
+      </view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onTempleQuizSubmit">
+          <text class="keju-btn-text">提 交 答 卷</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗C：结果弹窗（称号 + 对题数/3 + 打字点评文 + 错题解析）
+       绑定：data.showTempleResult
+       展示内容：
+         templeResultTitle   ：南越贤徒 / 谒王者 / 庙前客 / 庙外人（取决于对题数）
+         templeScore         ：答对 X / 3 题
+         templeResultText    ：点评文案（打字中 templeResultTyping=true 光标）
+         templeWrongDetails  ：错题解析（有错题才显示 wx:if）
+       关闭按钮：onTempleResultClose → 走过渡到下一站越王井 -->
+  <view wx:if="{{showTempleResult}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel keju-panel-large">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-result-glow"></view>
+      <view class="keju-result-rank-big">{{templeResultTitle}}</view>
+      <view class="temple-score-display">答对 {{templeScore}} / 3 题</view>
+      <view class="keju-result-bubble">
+        <text class="result-text">{{templeResultText}}</text>
+        <text wx:if="{{templeResultTyping}}" class="msg-cursor">|</text>
+      </view>
+      <view wx:if="{{templeWrongDetails}}" class="temple-wrong-details">
+        <text class="temple-wrong-title">📖 错题解析：</text>
+        <text class="temple-wrong-text">{{templeWrongDetails}}</text>
+      </view>
+      <view class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary" bindtap="onTempleResultClose">
+          <text class="keju-btn-text">继 续 探 索</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ==========================================================
+       模块12：正相塔 · 大结局弹窗（流程收尾）
+       绑定状态：data.showEnding === true 时显示
+       触发时机：正相塔景点 AI 判卷完成 → checkTransitionAndShow 检测到
+                currentSpotKey='zhengxiangta' → 调用 _showEndingPopup
+       结局分野（_showEndingPopup 内判定）：
+         _perfScore >= 5 → ENDING_A 「优秀结局」（文脉传承圆满）
+         _perfScore <  5 → ENDING_B 「一般结局」（普通落幕）
+       展示内容：
+         endingText   ：结局文案（打字中 endingTyping=true 光标）
+         ending-btn   ：打字完成后才显示（wx:if="{{!endingTyping}}"）
+       关闭按钮：onEndingDone → 关闭弹窗（全流程结束）
+       ========================================================== -->
+  <view wx:if="{{showEnding}}" class="keju-mask" catchtouchmove="noop">
+    <view class="keju-panel keju-panel-large ending-panel">
+      <view class="keju-scroll-deco top"></view>
+      <view class="keju-scroll-deco bottom"></view>
+      <view class="keju-result-glow"></view>
+      <view class="ending-title-block">
+        <view class="ending-title-seal">大 结 局</view>
+        <view class="ending-title-line"></view>
+        <view class="ending-title-sub">塔 巅 落 幕</view>
+      </view>
+      <view class="ending-bubble">
+        <view class="ending-speaker">赵佗</view>
+        <text class="ending-text">{{endingText}}</text>
+        <text wx:if="{{endingTyping}}" class="msg-cursor">|</text>
+      </view>
+      <view wx:if="{{!endingTyping}}" class="keju-actions one-col">
+        <view class="keju-btn keju-btn-primary ending-btn" bindtap="onEndingDone">
+          <text class="keju-btn-text">永 记 佗 城</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

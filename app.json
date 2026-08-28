@@ -1,0 +1,19 @@
+{
+  "_comment": "========================================================================\n  赵佗历史文化之旅 · 小程序全局页面配置\n  参考文档: https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html\n========================================================================\n\n  【pages 页面路由顺序】\n  第1项 (pages/map-explore) 为启动首屏，用户打开小程序直接进入地图探索页\n  （项目硬约束：不经过 home 首页，直接进入沉浸式游览）\n\n  【window 全局导航栏】\n  主题色 #07C160 为微信绿，页面实际会用自定义导航覆盖此色\n========================================================================",
+
+  "pages": [
+    "pages/map-explore/map-explore",
+    "pages/index/index",
+    "pages/chat/chat"
+  ],
+
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#07C160",
+    "navigationBarTitleText": "拓拓 AI 助手",
+    "navigationBarTextStyle": "white"
+  },
+
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

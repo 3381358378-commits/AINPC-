@@ -1,0 +1,30 @@
+<!--
+  ============================================================================
+  首页 WXML 模板 (Home Page Template)
+  ============================================================================
+
+  【布局结构】
+    .welcome-container    —— 全屏容器，紫色渐变背景
+      .bg-overlay         —— 装饰性背景图层 (welcome-bg.png，30% 透明度)
+      .content            —— 内容居中块
+        .logo             —— Logo 头像 (logo.png)
+        .title / .subtitle —— 产品名 + 副标题
+        .enter-btn        —— [进入对话] 主按钮 (微信绿)
+        .map-btn          —— [地图探索] 次按钮 (金色渐变)
+
+  【注意】images/logo.png / images/welcome-bg.png 可能未包含在项目资源中，
+         小程序运行时若找不到图片会显示空白占位符，不影响核心功能。
+         （因为首屏是 map-explore，此页面极少被访问到）
+  ============================================================================
+-->
+
+<view class="welcome-container">
+  <view class="bg-overlay"></view>
+  <view class="content">
+    <image class="logo" src="/images/logo.png" mode="aspectFit" />
+    <view class="title">拓拓 AI 助手</view>
+    <view class="subtitle">智能对话，高效沟通</view>
+    <button class="enter-btn" bindtap="goToChat">进入对话</button>
+    <button class="map-btn" bindtap="goToMap">🗺️ 地图探索</button>
+  </view>
+</view>

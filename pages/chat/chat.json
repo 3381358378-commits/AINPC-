@@ -1,0 +1,5 @@
+{
+  "_comment": "聊天页（chat）页面配置：本页为佗城 6 景点 AI 对话核心页面，承载赵佗 AI 助手的主交互逻辑——含 6 景点流转（百岁街→越王庙→越王井→龙川考棚→苏堤→正相塔）、打字机效果、TTS 语音播放、越王令奖励、科举三关、谒王访贤任务、大结局弹窗等完整叙事链路。navigationBarTitleText 设置为「拓拓 AI 助手」即页面标题栏文字。usingComponents 为空表示本页不引入第三方或自定义组件，所有 UI 均由原生组件实现。",
+  "usingComponents": {},
+  "navigationBarTitleText": "拓拓 AI 助手"
+}

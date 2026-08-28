@@ -1,0 +1,57 @@
+{
+  "_comment": "========================================================================\n  赵佗历史文化之旅 · 微信开发者工具项目配置文件\n  参考文档: https://developers.weixin.qq.com/miniprogram/dev/devtools/projectconfig.html\n========================================================================\n\n  【libVersion 基础库版本】\n  当前锁定 3.17.0 灰度版，此版本存在 WAWorker.reportRealtimeAction 兼容问题，\n  全项目已通过 SafeStorage 纯内存存储绕开（详见 app.js 注释）。\n  若升级基础库后闪退问题消失，可考虑恢复 wx.Storage 以获得持久化能力。\n\n  【packOptions.ignore 打包排除规则】\n  以下内容仅在本地开发 / 自动测试时使用，不上传到微信小程序代码包：\n    · tts_cache/               TTS 本地音频缓存\n    · _backup_*                历史代码备份目录\n    · __pycache__/             Python 字节码缓存\n    · server.py / *.pyc        本地 TTS Flask 服务端代码\n    · test_voice.mp3 / debug.json  调试临时文件\n    · *.docx / *.zip           项目史料文档与压缩包\n========================================================================",
+
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "uglifyFileName": false,
+    "enhance": true,
+    "urlCheck": false,
+    "newFeature": true,
+    "autoAudits": false,
+    "coverView": true,
+    "showShadowRootInWxmlPanel": true,
+    "scopeDataCheck": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "uploadWithSourceMap": true,
+    "compileHotReLoad": false,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "useCompilerPlugins": false,
+    "minifyWXML": true,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "condition": true
+  },
+
+  "compileType": "miniprogram",
+  "simulatorPluginLibVersion": {},
+  "libVersion": "3.17.0",
+
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "tts_cache" },
+      { "type": "folder", "value": "_backup_20260810" },
+      { "type": "folder", "value": "_backup_20260812_before_voice_turn_on" },
+      { "type": "folder", "value": "__pycache__" },
+      { "type": "file",   "value": "server.py" },
+      { "type": "file",   "value": "test_voice.mp3" },
+      { "type": "file",   "value": "debug.json" },
+      { "type": "suffix", "value": ".docx" },
+      { "type": "suffix", "value": ".zip" },
+      { "type": "suffix", "value": ".pyc" }
+    ],
+    "include": []
+  },
+
+  "_appid_note": "⚠️ 开源发布时请把下方 appid 替换为你自己在微信公众平台申请的小程序 AppID (wx 开头)",
+  "appid": "touristappid",
+  "editorSetting": {}
+}

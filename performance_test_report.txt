@@ -1,0 +1,58 @@
+============================================================
+AINPC 性能指标测试报告
+测试时间: 2026-08-26 00:56:01
+测试环境: 模拟TTS服务器(端口5003)
+缓存文件: 16个
+============================================================
+
+--- Metric 1: AI Text First Response Latency ---
+Model: qwen-plus (streaming)
+Estimated:
+  First char response: ~0.8-1.5s
+  Full text response: ~2.0-4.0s (200 chars)
+Target: <= 2.0s (first char)
+Result: [pending] Needs API recovery for real test
+Ref: This test Chat API latency ~0.7s (401 error, network only)
+
+--- Metric 2: TTS First Audio Latency ---
+First gen (MISS): avg 3.512s (simulated)
+Memory cache hit: avg 0.0218s
+Real TTS first gen: ~2.5-5.0s (network+API+OSS download)
+Target: <= 3.0s (first gen)
+Result: [pending] Needs API recovery for real test
+
+--- Metric 3: Audio Cache Hit Rate ---
+总请求: 6
+内存命中: 2 (33.3%)
+磁盘命中: 0 (0.0%)
+MISS: 4 (66.7%)
+综合命中率: 33.3%
+目标值: ≥ 85% (高频讲解词)
+
+--- Metric 4: Concurrent Request Success Rate ---
+10 concurrent: 100% success
+20 concurrent: 100% success
+50 concurrent: 100% success
+100 concurrent: 100% success
+Target: >= 99% (50 concurrent)
+Result: [pending] Local mock env, for reference only
+Real concurrent depends on server hardware/network/DashScope rate limit
+
+--- Metric 5: API Call Cost Reduction ---
+No cache: 8 API calls
+With cache: 6 API calls
+Reduction: 25.0%
+Target: >= 60%
+达标: Depends on pre-cache coverage
+
+--- Metric 6: Audio-Text Sync Error ---
+Estimated: 300-500ms (normal network)
+Target: <= 500ms
+Result: [pending] Estimated OK, needs real device test
+Mechanism: dual-gate + onTimeUpdate driven
+
+--- Metric 7: Crash Rate ---
+Estimated: < 0.5%
+Target: <= 0.5%
+Result: [pending] Estimated OK, needs multi-device test
+7 core protections cover all known crash scenarios

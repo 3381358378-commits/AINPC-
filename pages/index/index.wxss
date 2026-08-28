@@ -1,0 +1,104 @@
+/**
+ * ============================================================================
+ *  首页样式表 (Home Page Stylesheet)
+ * ============================================================================
+ *
+ *  视觉风格：紫蓝色渐变 + 大圆角按钮，整体偏现代科技感。
+ *  （与 map-explore / chat 页的"古风暗色"风格不同，
+ *   这是早期模板遗留风格，目前未被访问到，故未统一风格。）
+ *
+ *  若后续启用此首页，建议统一为佗城项目的"古铜金 + 暗木色"风格，
+ *  参考 map-explore.wxss 的配色体系 (#c9a96e / #1a1410 / #e8dcc0)。
+ * ============================================================================
+ */
+
+/* 全屏容器：紫蓝渐变作为底色 */
+.welcome-container {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 背景图层：welcome-bg.png 居中铺展，30% 透明做渐变融合 */
+.bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('/images/welcome-bg.png') center/cover no-repeat;
+  opacity: 0.3;
+  z-index: 1;
+}
+
+/* 内容块：Flex 垂直居中 */
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 40rpx;
+}
+
+/* Logo 头像：圆形白色半透明底（图片缺失时也不会显得空） */
+.logo {
+  width: 180rpx;
+  height: 180rpx;
+  margin-bottom: 40rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 标题：大号白色字 + 文字阴影 */
+.title {
+  font-size: 56rpx;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 20rpx;
+  text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
+}
+
+/* 副标题：半透明白字 */
+.subtitle {
+  font-size: 30rpx;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 80rpx;
+  letter-spacing: 4rpx;
+}
+
+/* 主按钮 [进入对话]：微信绿渐变 */
+.enter-btn {
+  width: 400rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, #07C160 0%, #06ad56 100%);
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 600;
+  border-radius: 48rpx;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.4);
+  border: none;
+}
+.enter-btn::after { border: none; }
+
+/* 次按钮 [地图探索]：金色渐变 */
+.map-btn {
+  width: 400rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin-top: 28rpx;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  color: #1a1a1a;
+  font-size: 34rpx;
+  font-weight: 600;
+  border-radius: 48rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 140, 0, 0.4);
+  border: none;
+}
+.map-btn::after { border: none; }

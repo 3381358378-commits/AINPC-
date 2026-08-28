@@ -1,0 +1,8 @@
+{
+  "_comment": "【佗城·赵佗历史文化之旅】地图探索页（map-explore）页面配置。本页为沉浸式古铜金主题的全屏地图打卡页：开场赵佗引导→主城地图探索→6大景点（百岁街/越王庙/越王井/龙川考棚/苏堤/正相塔）热区点击打卡→NPC赵佗瞬移带路→TTS语音讲解+打字机叙事。navigationBar 采用 #1a1410 暗木色背景（对应全局视觉基调），disableScroll=true 交由内部 scroll-view 自管地图滚动以保证热区百分比坐标锚定正确。",
+  "navigationBarTitleText": "佗城·赵佗历史文化之旅",
+  "navigationBarBackgroundColor": "#1a1410",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#1a1410",
+  "disableScroll": true
+}

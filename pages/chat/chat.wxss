@@ -1,0 +1,1873 @@
+/* ==========================================================================
+   chat.wxss — 佗城 AI 对话聊天页完整样式表
+   颜色约定（全局设计语言）：
+     · #1a1410 / #0d0804  深棕色/近黑色背景 —— 古风暗色调，营造历史厚重感
+     · #d4a856 / #c9a96e / #b8923f  金色系（主色）—— 皇家/庙宇尊贵感，赵佗南越王身份象征
+     · #e8d5a0 / #e8dcc0  米金色（辅色）—— 正文文字、气泡内容，易读不刺眼
+     · #8a7a5e / #5a4d38  暗金色（辅助）—— 副标题、提示文字、次级信息
+     · #07C160  微信绿 —— 用户气泡、发送按钮、扫码FAB（符合微信用户交互习惯）
+     · #ff6b6b  红色（警示）—— 静音斜线、调试面板标题栏（仅功能性使用）
+     · #8b6914  深金棕色 —— 渐变按钮的中间过渡色，加强古风质感
+     · #e0e0e0  浅灰 —— 输入栏背景、占位符等基础界面元素
+   组件索引（按文件内出现顺序）：
+     1. 全局容器 + 全屏古风背景图
+     2. 右上角静音按钮（有声/静音两套 SVG-like 纯 CSS 绘制图标）
+     3. 消息滚动区（聊天气泡/头像/打字光标/加载点点点）
+     4. 底部输入栏（相机按钮+文本框+发送按钮）
+     5. 用户图片气泡（发送图片时渲染）
+     6. 右中悬浮扫码打卡 FAB
+     7. 过渡弹窗（赵佗虚影头像 + 双按钮：闲聊/移步下一景点）
+     8. 景点介绍弹窗（卷轴风 + 打字机 + 进入景点按钮）
+     9. 越王令奖励弹窗（金色光环 + 令牌图 + 接受按钮）
+     10. 龙川考棚·科举弹窗系列（遮罩层 + 通用面板 + 6 子弹窗共用样式）
+     11. 正相塔·大结局弹窗（印风格式标题 + 赵佗结尾语）
+     12. 悬浮调试面板（左上角红色 FAB + 可滚动错误日志面板）
+     13. 越王庙「谒王访贤」任务弹窗（复用科举面板样式基础扩展）
+   ========================================================================== */
+
+/* ========== 1. 全局容器：100vh 全屏列布局，深棕色打底，溢出隐藏 ========== */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1a1410;   /* 深棕古风背景（背景图加载前兜底） */
+  position: relative;
+  overflow: hidden;
+}
+
+/* ========== 全屏古风背景图层（固定不动，z-index:0，不拦截点击） ========== */
+/* 延展至整个手机屏幕，aspectFill 保证画面完整覆盖不留白边 */
+.chat-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;    /* 背景不拦截触摸，让下方聊天区可交互 */
+}
+
+.chat-bg image {
+  width: 100%;
+  height: 100%;
+}
+
+/* ============ 2. 右上角静音按钮（圆形金框 + 纯 CSS 绘制铃铛+声波）============ */
+/* 位置：top:60rpx right:30rpx ；z-index:999 保证在所有弹窗之上（但遮罩层之下）*/
+.mute-btn {
+  position: fixed;
+  top: 60rpx;
+  right: 30rpx;
+  width: 80rpx;
+  height: 80rpx;
+  background: rgba(26, 16, 8, 0.85);   /* 半透明深棕底 */
+  border: 2rpx solid #d4a856;          /* 金色边框 = 主色点缀 */
+  border-radius: 50%;
+  z-index: 999;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;   /* 按压缩放动画过渡 */
+}
+
+/* 按压反馈：缩放到 0.9 倍提供触觉感 */
+.mute-btn:active {
+  transform: scale(0.9);
+}
+
+/* 有声/静音图标容器（48rpx 正方相对定位，内部声波/铃铛 absolute 排布） */
+.mute-icon-sound,
+.mute-icon-mute {
+  position: relative;
+  width: 48rpx;
+  height: 48rpx;
+}
+
+/* 铃铛本体：纯 CSS 三角形（边框构成）+ 矩形柄，金色 #d4a856 */
+.sound-bell {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 14rpx solid transparent;
+  border-bottom: 14rpx solid transparent;
+  border-right: 18rpx solid #d4a856;
+}
+
+.sound-bell::before {
+  content: '';
+  position: absolute;
+  right: -28rpx;
+  top: -10rpx;
+  width: 14rpx;
+  height: 20rpx;
+  background: #d4a856;
+  border-radius: 4rpx;
+}
+
+/* 声波：三层半圆弧（右开口），有声模式下做渐弱呼吸动画 */
+.sound-wave {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 3rpx solid #d4a856;
+  border-left: none;
+  border-radius: 0 50% 50% 0;
+  background: transparent;
+}
+
+/* 第一层（最内层）声波 */
+.sound-wave.w1 {
+  width: 10rpx;
+  height: 14rpx;
+  right: -12rpx;
+}
+
+/* 第二层（中间层）声波 */
+.sound-wave.w2 {
+  width: 16rpx;
+  height: 22rpx;
+  right: -22rpx;
+}
+
+/* 第三层（最外层）声波 */
+.sound-wave.w3 {
+  width: 22rpx;
+  height: 30rpx;
+  right: -34rpx;
+}
+
+/* 有声模式下 3 条声波错开 0.2s 依次呼吸闪烁 */
+.mute-icon-sound .sound-wave.w1 { animation: waveAnim 1.2s ease-in-out infinite 0s; }
+.mute-icon-sound .sound-wave.w2 { animation: waveAnim 1.2s ease-in-out infinite 0.2s; }
+.mute-icon-sound .sound-wave.w3 { animation: waveAnim 1.2s ease-in-out infinite 0.4s; }
+
+@keyframes waveAnim {
+  0%, 100% { opacity: 1; transform: translateY(-50%) scaleX(1); }
+  50% { opacity: 0.4; transform: translateY(-50%) scaleX(0.6); }
+}
+
+/* 静音模式：3 条声波全部变淡 30%，再叠加一条红色斜杠（#ff6b6b 警示色） */
+.mute-icon-mute .sound-wave {
+  opacity: 0.3;
+}
+
+.sound-slash {
+  position: absolute;
+  width: 60rpx;
+  height: 3rpx;
+  background: #ff6b6b;   /* 红色 = 警示/禁用含义 */
+  left: -6rpx;
+  top: 50%;
+  transform: translateY(-50%) rotate(-35deg);
+  border-radius: 2rpx;
+  box-shadow: 0 0 8rpx rgba(255, 107, 107, 0.6);   /* 红光晕强调禁用状态 */
+}
+
+/* ========== 3. 消息滚动区（flex:1 占据中间全部空间；z-index:1 在背景之上）========== */
+.chat-scroll {
+  flex: 1;
+  height: 0;               /* 经典 flex 子项 0 高技巧：保证内部 scroll-view 正确滚动 */
+  padding: 20rpx 0;
+  position: relative;
+  z-index: 1;
+}
+
+.message-list {
+  padding: 20rpx 20rpx;
+}
+
+/* 单条消息容器：头像 + 气泡，底部 32rpx 间隔 */
+.message-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 32rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 用户消息：row-reverse，头像在右、气泡在左 */
+.message-user {
+  flex-direction: row-reverse;
+}
+
+/* Bot（赵佗）消息：正序 row，头像在左、气泡在右 */
+.message-bot {
+  flex-direction: row;
+}
+
+/* 头像通用：80rpx 圆角正方，灰底兜底 */
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: #e0e0e0;
+}
+
+/* 用户头像：微信绿 #07C160 兜底色（图未加载时不尴尬） */
+.user-avatar {
+  margin-left: 0;
+  background: #07C160;
+}
+
+/* Bot 头像：橙金色（古铜色）兜底，右间距 16rpx 与气泡拉开 */
+.bot-avatar {
+  margin-right: 16rpx;
+  background: #ff9500;
+}
+
+/* 气泡通用：最大宽 480rpx，圆角 16，内边距 24/28，长文本自动断词断行 */
+.message-bubble {
+  max-width: 480rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 16rpx;
+  position: relative;
+  word-break: break-all;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* 用户气泡：半透明微信绿底 + 黑字，右上角削一刀 + 右外边距 */
+.user-bubble {
+  background: rgba(149, 236, 105, 0.85);
+  color: #000000;
+  border-top-right-radius: 4rpx;   /* 右上角平直 = 指向用户头像的"尾巴"效果 */
+  margin-right: 20rpx;
+}
+
+/* Bot 气泡：90% 白卡 + 黑字，左上角削一刀 + 浅阴影，与用户气泡形成镜像对称 */
+.bot-bubble {
+  background: rgba(255, 255, 255, 0.90);
+  color: #000000;
+  border-top-left-radius: 4rpx;    /* 左上角平直 = 指向 bot 头像的"尾巴"效果 */
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+}
+
+/* 气泡正文：30rpx 字号 1.6 行距，支持\n换行，英文长词断行 */
+.message-text {
+  display: inline;
+  font-size: 30rpx;
+  line-height: 1.6;
+  word-break: break-all;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* 打字光标 "|"：30rpx 同字号，字重300极细，0.8s 闪烁（与 message-text 行高对齐） */
+.msg-cursor {
+  display: inline-block;
+  font-size: 30rpx;
+  line-height: 1.6;
+  color: #000;
+  font-weight: 300;
+  margin-left: 2rpx;
+  animation: msgCursorBlink 0.8s step-end infinite;
+}
+
+@keyframes msgCursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* AI 思考中 3 个点点动画：灰色 #999，上下浮动 + 透明度交替 */
+.typing-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10rpx;
+  height: 40rpx;
+}
+
+.typing-dots .dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #999;
+  margin: 0 6rpx;
+  animation: typing 1.4s infinite;
+}
+
+.dot1 { animation-delay: 0s; }
+.dot2 { animation-delay: 0.2s; }
+.dot3 { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-10rpx); opacity: 1; }
+}
+
+/* ========== 4. 底部输入栏（80% 不透明浅灰底 + 顶部细线分割；适配 iPhone 安全区底部）========== */
+.input-bar {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  background: rgba(247, 247, 247, 0.80);
+  border-top: 1rpx solid rgba(224, 224, 224, 0.5);
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));   /* iPhone 刘海屏底部安全区 */
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== 4a. 相机按钮（左）：72rpx 白色圆形 + 灰色边框；hover 反馈 0.95 缩放 ===== */
+.camera-btn {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+  border: 1rpx solid #e0e0e0;
+}
+
+.camera-btn-hover {
+  background: #f0f0f0;
+  transform: scale(0.95);
+}
+
+.camera-icon {
+  font-size: 36rpx;
+  line-height: 1;
+}
+
+/* ===== 用户图片气泡：发图时嵌入用户气泡中，360rpx 宽 + 12rpx 圆角 ===== */
+/* 当用户气泡包含图片时：气泡透明+内边距缩小，让图片作为真正的视觉主体 */
+.msg-image {
+  width: 360rpx;
+  max-width: 100%;
+  border-radius: 12rpx;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.user-bubble:has(.msg-image) {
+  padding: 8rpx;
+  background: transparent;
+}
+
+/* ===== 4b. 输入框包裹层：白底 + 8rpx 圆角 + 16/24 内边距 ===== */
+.input-wrapper {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 8rpx;
+  padding: 16rpx 24rpx;
+  margin-right: 20rpx;
+  min-height: 72rpx;
+}
+
+.message-input {
+  width: 100%;
+  font-size: 30rpx;
+  line-height: 40rpx;
+}
+
+.input-placeholder {
+  color: #999;    /* 浅灰 placeholder = 不可操作/引导含义 */
+}
+
+/* ===== 4c. 发送按钮（右）：微信绿 72rpx 高 + 8rpx 圆角；空输入态 disabled=0.5 ===== */
+.send-btn {
+  height: 72rpx;
+  line-height: 72rpx;
+  padding: 0 40rpx;
+  background: #07C160;     /* 微信绿 = 确认/发送操作语义色 */
+  color: #ffffff;
+  font-size: 30rpx;
+  border-radius: 8rpx;
+  border: none;
+  flex-shrink: 0;
+}
+
+.send-btn-active { opacity: 1; }
+.send-btn[disabled] { opacity: 0.5; }    /* 禁用态半透明，视觉上不可点击 */
+.send-btn::after { border: none; }       /* 清除小程序 button 默认边框线 */
+
+/* ========== 6. 扫码打卡 FAB（悬浮于输入栏右上方；圆形微信绿渐变）========== */
+/* 位置：right:30rpx bottom:260rpx；140rpx 大圆；z-index:99 在输入栏之上、遮罩之下 */
+.scan-fab {
+  position: fixed;
+  right: 30rpx;
+  bottom: 260rpx;
+  width: 140rpx;
+  height: 140rpx;
+  background: linear-gradient(135deg, #07C160 0%, #06ad56 100%);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;     /* 图标在上、文字在下纵向排列 */
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.45);   /* 绿色外阴影，视觉悬浮感 */
+  z-index: 99;
+  color: #ffffff;
+}
+
+.scan-fab-hover {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+.scan-fab-icon {
+  font-size: 40rpx;
+  line-height: 1;
+  margin-bottom: 6rpx;
+}
+
+.scan-fab-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* ============ 7. 过渡弹窗（赵佗虚影头像 + 双按钮；判卷完成后引导去下一景点）============ */
+/* 遮罩层：75% 黑底覆盖全屏；0.3s 淡入动画；z-index:999 在所有业务 UI 之上 */
+.transition-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  animation: maskFadeIn 0.3s ease;
+}
+
+@keyframes maskFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 弹窗主体：深蓝紫渐变底 + 2rpx 金边 + 金光彩晕阴影；弹性弹出动画 */
+.transition-dialog {
+  width: 620rpx;
+  background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+  border-radius: 24rpx;
+  border: 2rpx solid #d4a856;
+  padding: 40rpx 36rpx;
+  box-shadow: 0 0 60rpx rgba(212, 168, 86, 0.4);
+  animation: dialogPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);   /* 轻微回弹效果 */
+}
+
+@keyframes dialogPop {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 弹窗头部区：居中纵向排列 头像+光晕+标题 */
+.td-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+/* 赵佗虚影头像：140rpx 圆形 + 深紫底 */
+.td-avatar {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background: #2a2a3e;
+  z-index: 2;
+}
+
+/* 头像外圈金色呼吸光晕：radial-gradient 径向渐变 + 2s 呼吸放大缩小动画 */
+.td-npc-glow {
+  position: absolute;
+  top: 10rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 86, 0.6) 0%, transparent 70%);
+  animation: npcGlow 2s ease-in-out infinite;
+}
+
+@keyframes npcGlow {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
+  50% { transform: translateX(-50%) scale(1.2); opacity: 1; }
+}
+
+/* 标题：「赵佗虚影」金棕色 26rpx 字重600 + 字间距 4rpx 加强庄严感 */
+.td-title {
+  color: #d4a856;
+  font-size: 26rpx;
+  font-weight: 600;
+  margin-top: 16rpx;
+  letter-spacing: 4rpx;
+}
+
+/* （保留字段，历史兼容）*/
+.td-body {
+  margin-bottom: 36rpx;
+}
+
+/* （保留字段，历史兼容：过渡弹窗不展示文字区，只展示头像+按钮）*/
+.td-bubble {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1rpx solid rgba(212, 168, 86, 0.3);
+  border-radius: 16rpx;
+  padding: 28rpx 24rpx;
+  min-height: 160rpx;
+}
+
+.td-text {
+  color: #e8e0d0;
+  font-size: 28rpx;
+  line-height: 1.8;
+  letter-spacing: 1rpx;
+}
+
+.td-cursor {
+  display: inline-block;
+  color: #d4a856;
+  font-weight: 300;
+  animation: cursorBlink 0.8s infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 双按钮行：gap:20rpx 均匀分布 */
+.td-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+/* 按钮通用：100rpx 高 16rpx 圆角，纵向排列 图标+标签 */
+.td-btn {
+  flex: 1;
+  height: 100rpx;
+  border-radius: 16rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.td-btn:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* 左按钮（闲聊）：半透明白描边 + 浅灰字 = 次要操作 */
+.td-btn-stay {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+}
+
+/* 右按钮（移步）：金色渐变 + 金色阴影 = 主要操作（推荐选项） */
+.td-btn-go {
+  background: linear-gradient(135deg, #d4a856 0%, #b8923f 100%);
+  box-shadow: 0 4rpx 16rpx rgba(212, 168, 86, 0.4);
+}
+
+.td-btn-icon {
+  font-size: 32rpx;
+  margin-bottom: 4rpx;
+}
+
+.td-btn-label {
+  font-size: 24rpx;
+  color: #ffffff;
+  font-weight: 500;
+  letter-spacing: 2rpx;
+}
+
+/* 次要按钮文字降为浅灰，与主按钮金色形成视觉层级 */
+.td-btn-stay .td-btn-label {
+  color: #ccc;
+}
+
+/* ============ 8. 景点介绍弹窗（卷轴风介绍页；移步景点过渡时弹出，点击"进入景点"才开始新景点剧情）============ */
+/* 遮罩：径向渐变中心深棕 → 四周纯黑，模拟古卷徐徐展开的聚光氛围 */
+.intro-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(40, 20, 10, 0.85) 0%, rgba(10, 5, 2, 0.97) 60%, rgba(0, 0, 0, 1) 100%);
+  animation: introMaskFadeIn 0.5s ease;
+}
+
+@keyframes introMaskFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 介绍面板主体：640rpx 宽无固定底（由内容撑开），50/44/44 内边距，0.5s 弹性弹出 */
+.intro-panel {
+  position: relative;
+  width: 640rpx;
+  padding: 50rpx 44rpx 44rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: introPanelPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes introPanelPop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 卷轴上下装饰线：金色渐变横线，左右留白 36rpx 造成卷轴两端效果 */
+.intro-scroll-decoration {
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
+  height: 4rpx;
+  background: linear-gradient(90deg, transparent, #c9a96e, transparent);   /* 两端透明 → 中间金 */
+}
+.intro-scroll-decoration.top { top: 10rpx; }
+.intro-scroll-decoration.bottom { bottom: 10rpx; }
+
+/* 头像包裹层：220rpx 正方相对定位，头像+光环父子叠放 */
+.intro-avatar-wrap {
+  position: relative;
+  width: 220rpx;
+  height: 220rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+/* 赵佗头像：200rpx 圆形 + 4rpx 金边 + 半透明深色底 */
+.intro-avatar {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 50%;
+  border: 4rpx solid #c9a96e;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 2;
+}
+
+/* 头像外金色呼吸光环（inset:-10rpx 比头像大一圈）*/
+.intro-glow {
+  position: absolute;
+  inset: -10rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.45) 0%, transparent 70%);
+  animation: introGlowPulse 2.5s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes introGlowPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* 景点名称大字：46rpx 粗字 + 12rpx 宽字距 + 金色文字阴影（立体感）*/
+.intro-spot-name {
+  margin-top: 28rpx;
+  font-size: 46rpx;
+  font-weight: 700;
+  color: #c9a96e;
+  letter-spacing: 12rpx;
+  text-shadow: 0 0 20rpx rgba(201, 169, 110, 0.5);
+  z-index: 2;
+}
+
+/* 副标题（如「民心所归，香火永续」）：24rpx 暗金小字 */
+.intro-spot-subtitle {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8a7a5e;
+  letter-spacing: 6rpx;
+  z-index: 2;
+}
+
+/* 介绍文本对话框：55% 黑底半透 + 40% 金边；最小高 220rpx，楷体古风字体 */
+.intro-dialog-box {
+  margin-top: 28rpx;
+  padding: 28rpx 30rpx;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2rpx solid rgba(201, 169, 110, 0.4);
+  border-radius: 16rpx;
+  max-width: 560rpx;
+  min-height: 220rpx;
+  z-index: 2;
+}
+
+/* 介绍正文：28rpx 米金 + 1.9 行距 + 1.5rpx 字距 + KaiTi/STKaiti 楷体（古风） */
+.intro-dialog-text {
+  font-size: 28rpx;
+  color: #e8dcc0;
+  line-height: 1.9;
+  letter-spacing: 1.5rpx;
+  font-family: "KaiTi", "STKaiti", serif;   /* KaiTi=楷体，让介绍文字更像文言文古书 */
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 介绍打字机光标：金色粗体 + 0.8s 闪烁 */
+.intro-cursor {
+  display: inline-block;
+  color: #c9a96e;
+  font-weight: 700;
+  animation: introCursorBlink 0.8s step-end infinite;
+  margin-left: 2rpx;
+}
+
+@keyframes introCursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* "进入景点"按钮包裹层：36rpx 上边距 + 0.6s 从下往上淡入动画 */
+.intro-btn-wrap {
+  margin-top: 36rpx;
+  z-index: 2;
+  animation: introBtnFadeIn 0.6s ease;
+}
+
+@keyframes introBtnFadeIn {
+  from { opacity: 0; transform: translateY(16rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* "进入景点"按钮：340rpx 宽 92rpx 高，金色渐变（#c9a96e→#8b6914→#c9a96e 三段式）*/
+/* 按钮自带 +12rpx 字距 + 淡金边框 + 内外双层金色阴影光晕 */
+.intro-enter-btn {
+  width: 340rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  background: linear-gradient(135deg, #c9a96e 0%, #8b6914 50%, #c9a96e 100%);
+  color: #1a1410;   /* 深棕字在金底上对比度足，不刺眼 */
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 12rpx;
+  border-radius: 46rpx;
+  border: 2rpx solid #e8d5a0;
+  box-shadow: 0 6rpx 24rpx rgba(201, 169, 110, 0.5), 0 0 60rpx rgba(201, 169, 110, 0.3);
+  position: relative;
+  padding: 0;
+}
+
+.intro-enter-btn::after { border: none; }
+.intro-enter-btn .btn-text { position: relative; z-index: 2; }
+
+/* 按钮外发光晕环：inset:-10rpx 比按钮大，径向渐变金色+2s 呼吸动画 */
+.btn-glow {
+  position: absolute;
+  inset: -10rpx;
+  border-radius: 50rpx;
+  background: radial-gradient(ellipse at center, rgba(201, 169, 110, 0.4) 0%, transparent 70%);
+  animation: btnGlowAnim 2s ease-in-out infinite;
+  pointer-events: none;   /* 光晕不拦截按钮点击 */
+}
+
+@keyframes btnGlowAnim {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ============ 9. 越王令奖励弹窗（答对越王井题目后的收藏道具奖励动画弹窗）============ */
+/* 遮罩：85% 黑底覆盖；0.4s 淡入；z-index:1000 最高层 */
+.token-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: tokenFadeIn 0.4s ease;
+}
+
+@keyframes tokenFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 令牌面板：580rpx 宽深棕渐变底 + 3rpx 粗金边；双层金色阴影营造皇室珍藏氛围 */
+/* 弹出动画：0.6s 从 0.5 倍缩放 + 下移 40rpx 弹到正常位置（更夸张的"宝物降临"视觉）*/
+.token-panel {
+  position: relative;
+  width: 580rpx;
+  padding: 50rpx 40rpx 40rpx;
+  background: linear-gradient(180deg, #1a1008 0%, #0d0804 100%);
+  border: 3rpx solid #d4a856;
+  border-radius: 28rpx;
+  box-shadow: 0 0 80rpx rgba(212, 168, 86, 0.5),
+              0 0 200rpx rgba(212, 168, 86, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: tokenPanelPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tokenPanelPop {
+  from { transform: scale(0.5) translateY(40rpx); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* 面板上下卷轴装饰线：与景点介绍弹窗风格统一 */
+.token-scroll-deco {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  height: 3rpx;
+  background: linear-gradient(90deg, transparent, #d4a856, transparent);
+}
+
+.token-scroll-deco.top { top: 16rpx; }
+.token-scroll-deco.bottom { bottom: 16rpx; }
+
+/* 令牌光环：360rpx 大圆径向金色渐变，置于面板正中 z-index:1（令牌图 z-index:2 在上）*/
+.token-glow-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 360rpx;
+  height: 360rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 86, 0.4) 0%, transparent 70%);
+  animation: tokenGlowPulse 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tokenGlowPulse {
+  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* 越王令图片：280rpx 正方 + 3s 上下浮动动画（宝物悬浮效果） */
+.token-image {
+  position: relative;
+  width: 280rpx;
+  height: 280rpx;
+  z-index: 2;
+  animation: tokenImageFloat 3s ease-in-out infinite;
+}
+
+@keyframes tokenImageFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10rpx); }
+}
+
+/* 令牌标题「越 王 令」：44rpx 粗体 + 16rpx 宽字距 + 金色文字投影 */
+.token-title {
+  margin-top: 30rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #d4a856;
+  letter-spacing: 16rpx;
+  text-shadow: 0 0 20rpx rgba(212, 168, 86, 0.6);
+  z-index: 2;
+}
+
+/* 副标题（「岭南第一井 · 功勋凭证」）：24rpx 暗金小字 */
+.token-subtitle {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #b8923f;
+  letter-spacing: 4rpx;
+  z-index: 2;
+}
+
+/* 令牌描述卡片：8% 金底半透 + 30% 金边；内部分两行（主文+副文）*/
+.token-desc {
+  margin-top: 28rpx;
+  padding: 20rpx 24rpx;
+  background: rgba(212, 168, 86, 0.08);
+  border: 1rpx solid rgba(212, 168, 86, 0.3);
+  border-radius: 12rpx;
+  z-index: 2;
+}
+
+.token-desc-text {
+  display: block;
+  font-size: 26rpx;
+  color: #e8d5a0;   /* 主文米金亮色 */
+  text-align: center;
+  line-height: 1.6;
+  letter-spacing: 2rpx;
+}
+
+.token-desc-sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 21rpx;
+  color: #8a7a5e;     /* 副文暗金次级色 */
+  text-align: center;
+  line-height: 1.6;
+  letter-spacing: 2rpx;
+}
+
+.token-btn-wrap {
+  margin-top: 36rpx;
+  z-index: 2;
+}
+
+/* "接 受"按钮：320rpx×96rpx 金色渐变三段式（与景点介绍按钮风格统一）*/
+.token-accept-btn {
+  width: 320rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, #d4a856 0%, #8b6914 50%, #d4a856 100%);
+  border-radius: 48rpx;
+  border: 2rpx solid #e8d5a0;
+  box-shadow: 0 6rpx 24rpx rgba(212, 168, 86, 0.5);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.token-accept-btn:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* 接受按钮文字：32rpx 粗体 + 12rpx 宽字距 + 深棕字配金底 */
+.token-accept-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1a1008;
+  letter-spacing: 12rpx;
+}
+
+/* ============ 10. 龙川考棚·科举弹窗通用样式（以下所有 .keju-* 均为科举 6 弹窗+越王庙 3 弹窗共用基础）============ */
+/* 通用遮罩：85% 黑底；0.4s 淡入；z-index:1000 最顶 */
+.keju-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: kejuFade 0.4s ease;
+}
+
+@keyframes kejuFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 科举面板基础：600rpx 宽；深棕渐变+金边+双层金光晕阴影；0.55s 弹性弹出（回弹更明显）*/
+.keju-panel {
+  position: relative;
+  width: 600rpx;
+  background: linear-gradient(180deg, #1a1008 0%, #0d0703 100%);
+  border: 3rpx solid #d4a856;
+  border-radius: 24rpx;
+  padding: 50rpx 40rpx 40rpx;
+  box-shadow: 0 0 80rpx rgba(212, 168, 86, 0.45),
+              0 0 200rpx rgba(212, 168, 86, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: kejuPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Large 变体（殿试/结果/大结局/越王庙作答等内容多的弹窗用）：加宽至 640rpx */
+.keju-panel-large {
+  width: 640rpx;
+  padding: 46rpx 36rpx 36rpx;
+}
+
+@keyframes kejuPop {
+  from { transform: scale(0.5) translateY(60rpx); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* 上下卷轴装饰线（与越王令/景点介绍统一设计语言）*/
+.keju-scroll-deco {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  height: 3rpx;
+  background: linear-gradient(90deg, transparent, #d4a856, transparent);
+}
+.keju-scroll-deco.top { top: 14rpx; }
+.keju-scroll-deco.bottom { bottom: 14rpx; }
+
+/* 科举开始弹窗专属：头像位置径向金光晕（300rpx 大圆 + 3s 呼吸） */
+.keju-glow {
+  position: absolute;
+  top: 140rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300rpx;
+  height: 300rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 86, 0.35) 0%, transparent 70%);
+  animation: kejuGlow 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes kejuGlow {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+}
+
+/* 科举开始弹窗 · 头像：140rpx 圆形 + 金边 + 金光阴影 */
+.keju-avatar-wrap {
+  position: relative;
+  margin-bottom: 24rpx;
+  z-index: 2;
+}
+
+.keju-avatar {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  border: 3rpx solid #d4a856;
+  box-shadow: 0 4rpx 20rpx rgba(212, 168, 86, 0.6);
+}
+
+/* 标题「科 举 之 邀」：44rpx 粗体 + 16rpx 超宽字距 + 金色投影发光 */
+.keju-main-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #d4a856;
+  letter-spacing: 16rpx;
+  text-shadow: 0 0 20rpx rgba(212, 168, 86, 0.6);
+  margin-bottom: 24rpx;
+  z-index: 2;
+}
+
+/* 开场描述卡片：8% 金底半透 + 30% 金边；三行"赵佗邀考"话术居中对齐 */
+.keju-start-desc {
+  padding: 20rpx 24rpx;
+  background: rgba(212, 168, 86, 0.08);
+  border: 1rpx solid rgba(212, 168, 86, 0.3);
+  border-radius: 12rpx;
+  margin-bottom: 36rpx;
+  z-index: 2;
+}
+
+.keju-start-text {
+  display: block;
+  font-size: 26rpx;
+  color: #e8d5a0;
+  line-height: 2;
+  letter-spacing: 2rpx;
+  text-align: center;
+}
+
+/* 任务徽标胶囊「任 务」：15% 金底半透 + 50% 金边 + 24rpx 胶囊按钮 */
+.keju-intro-badge {
+  padding: 6rpx 40rpx;
+  background: rgba(212, 168, 86, 0.15);
+  border: 1rpx solid rgba(212, 168, 86, 0.5);
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  color: #d4a856;
+  letter-spacing: 8rpx;
+  margin-bottom: 20rpx;
+}
+
+/* 任务标题大字（「金 榜 题 名」「谒 王 访 贤」共用）：44rpx 粗体 + 16rpx 宽字距 */
+.keju-intro-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #d4a856;
+  letter-spacing: 16rpx;
+  text-shadow: 0 0 20rpx rgba(212, 168, 86, 0.5);
+  margin-bottom: 14rpx;
+}
+
+/* 标题下方短金色分隔线：120rpx 宽 3rpx 高 */
+.keju-intro-divider {
+  width: 120rpx;
+  height: 3rpx;
+  background: linear-gradient(90deg, transparent, #d4a856, transparent);
+  margin-bottom: 20rpx;
+}
+
+/* 任务介绍正文：26rpx 米金 2 行距 居中 */
+.keju-intro-content {
+  margin-bottom: 28rpx;
+}
+.keju-intro-line {
+  display: block;
+  font-size: 26rpx;
+  color: #e8d5a0;
+  line-height: 2;
+  text-align: center;
+  letter-spacing: 2rpx;
+}
+
+/* 三关进度条：6% 金底半透 + 14rpx 圆角 + 虚线金边（模拟科举考卷风格）*/
+.keju-intro-stages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 36rpx;
+  padding: 20rpx 16rpx;
+  background: rgba(212, 168, 86, 0.06);
+  border-radius: 14rpx;
+  border: 1rpx dashed rgba(212, 168, 86, 0.3);
+}
+
+.stage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20rpx;
+}
+
+/* 每关编号「壹/贰/叁」：34rpx 粗金 + 金光投影 */
+.stage-num {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #d4a856;
+  letter-spacing: 0;
+  text-shadow: 0 0 10rpx rgba(212, 168, 86, 0.5);
+}
+
+.stage-name {
+  font-size: 26rpx;
+  color: #e8d5a0;
+  margin-top: 6rpx;
+  letter-spacing: 4rpx;
+}
+
+.stage-hint {
+  font-size: 20rpx;
+  color: #8a7a5e;    /* 暗金小字提示（选择题/填空题/主观题）*/
+  margin-top: 4rpx;
+  letter-spacing: 2rpx;
+}
+
+/* 关卡之间金色箭头「→」 */
+.stage-arrow {
+  font-size: 28rpx;
+  color: #d4a856;
+  padding: 0 4rpx;
+}
+
+/* 关卡标签「第一关 · 乡 试」：线性左浅中深右浅金边胶囊 + 26rpx 金粗体 */
+.keju-stage-tag {
+  padding: 6rpx 40rpx;
+  background: linear-gradient(90deg, rgba(212, 168, 86, 0.15), rgba(212, 168, 86, 0.25), rgba(212, 168, 86, 0.15));
+  border: 1rpx solid rgba(212, 168, 86, 0.5);
+  border-radius: 22rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #d4a856;
+  letter-spacing: 8rpx;
+  margin-bottom: 24rpx;
+}
+
+/* 题目正文：30rpx 米金 1.8 行距；下方虚线金边与选项区分隔 */
+.keju-question {
+  font-size: 30rpx;
+  color: #e8d5a0;
+  line-height: 1.8;
+  letter-spacing: 2rpx;
+  text-align: center;
+  padding: 16rpx 16rpx 28rpx;
+  border-bottom: 1rpx dashed rgba(212, 168, 86, 0.3);
+  margin-bottom: 24rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ===== 乡试·选择题选项区：纵向列布局，选项间隔 16rpx ===== */
+.keju-options {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-bottom: 32rpx;
+}
+
+/* 单选选项卡片：默认 4% 白底半透 + 25% 金边；选中态变 15% 金底 + 100% 金边 + 金光内阴影 */
+.keju-option {
+  display: flex;
+  align-items: center;
+  padding: 22rpx 24rpx;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2rpx solid rgba(212, 168, 86, 0.25);
+  border-radius: 12rpx;
+  transition: all 0.2s;
+}
+
+.keju-option.selected {
+  background: rgba(212, 168, 86, 0.15);
+  border-color: #d4a856;
+  box-shadow: 0 0 16rpx rgba(212, 168, 86, 0.3);
+}
+
+/* 选项字母圆圈（A/B/C）：52rpx 圆 + 2rpx 金边；选中态金底深棕字 */
+.opt-key {
+  width: 52rpx;
+  height: 52rpx;
+  line-height: 48rpx;
+  text-align: center;
+  border: 2rpx solid #d4a856;
+  border-radius: 50%;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #d4a856;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.keju-option.selected .opt-key {
+  background: #d4a856;
+  color: #1a1008;
+}
+
+.opt-text {
+  font-size: 28rpx;
+  color: #e8d5a0;
+  letter-spacing: 2rpx;
+}
+
+/* ===== 会试·填空题输入框 ===== */
+.keju-input-wrap {
+  width: 100%;
+  margin-bottom: 20rpx;
+}
+
+.keju-input {
+  width: 100%;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2rpx solid rgba(212, 168, 86, 0.35);
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #e8d5a0;
+  box-sizing: border-box;
+}
+
+.keju-input-placeholder {
+  color: #6a5d48;    /* 棕灰色 placeholder = 输入引导色 */
+  font-size: 26rpx;
+}
+
+/* 题目提示文字（如「学而优则仕 · 不分寒门士族」）：暗金小字 21rpx */
+.keju-hint {
+  font-size: 21.rpx;
+  color: #8a7a5e;
+  letter-spacing: 2rpx;
+  margin-bottom: 28rpx;
+  align-self: flex-start;
+  padding-left: 8rpx;
+}
+
+/* ===== 殿试·主观题 textarea：240rpx 最小高；右下角字数统计 ===== */
+.keju-textarea-wrap {
+  position: relative;
+  width: 100%;
+  margin-bottom: 16rpx;
+}
+
+.keju-textarea {
+  width: 100%;
+  min-height: 240rpx;
+  padding: 20rpx 24rpx;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2rpx solid rgba(212, 168, 86, 0.35);
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  color: #e8d5a0;
+  line-height: 1.8;
+  box-sizing: border-box;
+}
+
+/* 字数统计：绝对定位在右下角，20rpx 暗金小字 */
+.keju-word-count {
+  position: absolute;
+  right: 10rpx;
+  bottom: -36rpx;
+  font-size: 20rpx;
+  color: #8a7a5e;
+  letter-spacing: 1rpx;
+}
+
+/* ===== 通用按钮区：1 列居中 or 2 列 左右排列 ===== */
+.keju-actions {
+  width: 100%;
+  display: flex;
+  gap: 20rpx;
+  z-index: 2;
+}
+
+.keju-actions.one-col {
+  justify-content: center;
+  margin-top: 4rpx;
+}
+
+.keju-actions.two-col {
+  flex-direction: row;
+}
+
+/* 科举按钮通用：92rpx 高 46rpx 胶囊圆角；按压 0.96 缩放 */
+.keju-btn {
+  flex: 1;
+  height: 92rpx;
+  line-height: 92rpx;
+  text-align: center;
+  border-radius: 46rpx;
+  transition: all 0.2s;
+}
+
+/* 单列按钮：固定宽度 360rpx 居中，不拉伸铺满 */
+.keju-actions.one-col .keju-btn {
+  width: 360rpx;
+  flex: none;
+}
+
+.keju-btn:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* 主按钮（确认/开始/进入等）：金渐变色 + 淡金边框 + 金光阴影（与其他弹窗主按钮一致）*/
+.keju-btn-primary {
+  background: linear-gradient(135deg, #d4a856 0%, #8b6914 50%, #d4a856 100%);
+  border: 2rpx solid #e8d5a0;
+  box-shadow: 0 6rpx 24rpx rgba(212, 168, 86, 0.5);
+}
+
+/* 次按钮（拒绝/放弃等）：6% 半透明白 + 35% 金边描边 */
+.keju-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 2rpx solid rgba(212, 168, 86, 0.35);
+}
+
+.keju-btn-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  letter-spacing: 6rpx;
+  color: #1a1008;   /* 主按钮：深棕字配金底（高对比度可读） */
+}
+
+/* 次按钮文字降为暗金色，与主按钮形成层级 */
+.keju-btn-secondary .keju-btn-text {
+  color: #b8923f;
+}
+
+/* ===== 科举评分结果弹窗专属 ===== */
+/* 结果大光环（比 keju-glow 更大，420rpx）：径向金色渐变 */
+.keju-result-glow {
+  position: absolute;
+  top: 100rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 420rpx;
+  height: 420rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 86, 0.5) 0%, transparent 70%);
+  animation: kejuGlowBig 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes kejuGlowBig {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+}
+
+/* 称号大字（状元/进士/贡士/举人）：80rpx 超粗体 + 24rpx 超宽字距 + 双层金光投影 + 弹出缩放动画 */
+.keju-result-rank-big {
+  font-size: 80rpx;
+  font-weight: 700;
+  color: #d4a856;
+  letter-spacing: 24rpx;
+  padding-left: 24rpx;
+  text-shadow: 0 0 30rpx rgba(212, 168, 86, 0.9),
+               0 0 80rpx rgba(212, 168, 86, 0.5);
+  margin-top: 20rpx;
+  margin-bottom: 10rpx;
+  z-index: 2;
+  animation: rankPop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);   /* 从 0.2 倍弹大，夸张放榜效果 */
+}
+
+@keyframes rankPop {
+  from { transform: scale(0.2); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 称号副标题（如「金科状元·文脉通达」）：24rpx 暗金小字 */
+.keju-result-rank-sub {
+  font-size: 24rpx;
+  color: #b8923f;
+  letter-spacing: 8rpx;
+  margin-bottom: 24rpx;
+  z-index: 2;
+}
+
+/* 三关得分圆点（乡/会/殿）：3 个 64rpx 金色圆点 + 40rpx 间距横向排列；点亮态=金底深棕字+金光影 */
+.keju-result-score-bar {
+  display: flex;
+  justify-content: center;
+  gap: 40rpx;
+  margin-bottom: 24rpx;
+  z-index: 2;
+}
+
+.score-dot {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 60rpx;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #5a4d38;     /* 未点亮：暗棕灰色字 */
+  background: rgba(255, 255, 255, 0.05);
+  border: 2rpx solid rgba(212, 168, 86, 0.2);
+}
+
+.score-dot.on {
+  color: #1a1008;     /* 已点亮：深棕字配金底 */
+  background: linear-gradient(135deg, #d4a856, #b8923f);
+  border-color: #e8d5a0;
+  box-shadow: 0 0 16rpx rgba(212, 168, 86, 0.6);
+}
+
+/* 赵佗评分评语气泡：6% 白半透 + 30% 金边；最小高 180rpx 保证打字空间 */
+.keju-result-bubble {
+  width: 100%;
+  padding: 24rpx 26rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(212, 168, 86, 0.3);
+  border-radius: 14rpx;
+  margin-bottom: 32rpx;
+  box-sizing: border-box;
+  min-height: 180rpx;
+  z-index: 2;
+}
+
+.result-text {
+  display: inline;
+  font-size: 26rpx;
+  color: #e8d5a0;
+  line-height: 1.8;
+  letter-spacing: 2rpx;
+}
+
+/* ============ 11. 正相塔·大结局弹窗（复用 keju-panel-large 基础样式，追加结束专属样式）============ */
+.ending-panel {
+  width: 620rpx;
+  padding: 46rpx 36rpx 36rpx;
+}
+
+/* 大结局标题块（竖向居中：印章+分隔线+副标题）*/
+.ending-title-block {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+/* 「大 结 局」印章：6rpx 金渐变底 + 淡金边框 + 12rpx 超宽字距 + 8rpx 圆角方印形状 */
+.ending-title-seal {
+  display: inline-block;
+  padding: 6rpx 36rpx;
+  background: linear-gradient(135deg, #8b6914, #d4a856, #8b6914);
+  border: 2rpx solid #e8d5a0;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1a1008;
+  letter-spacing: 12rpx;
+  padding-left: 48rpx;
+  padding-right: 48rpx;
+  box-shadow: 0 4rpx 20rpx rgba(212, 168, 86, 0.5);
+  margin-bottom: 14rpx;
+}
+
+/* 印章下方 300rpx 金色渐变分隔线 */
+.ending-title-line {
+  width: 300rpx;
+  height: 2rpx;
+  background: linear-gradient(90deg, transparent, #d4a856, transparent);
+  margin-bottom: 10rpx;
+}
+
+/* 副标题「塔 巅 落 幕」：24rpx 暗金 + 12rpx 宽字距 */
+.ending-title-sub {
+  font-size: 24rpx;
+  color: #b8923f;
+  letter-spacing: 12rpx;
+}
+
+/* 赵佗结语气泡：6% 金底半透 + 35% 金边；最小高 280rpx */
+.ending-bubble {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 28rpx 30rpx;
+  background: rgba(212, 168, 86, 0.06);
+  border: 1rpx solid rgba(212, 168, 86, 0.35);
+  border-radius: 16rpx;
+  margin-bottom: 36rpx;
+  box-sizing: border-box;
+  min-height: 280rpx;
+}
+
+/* 说话人标签「赵佗」：金渐变胶囊底 + 深棕粗体；区分台词归属 */
+.ending-speaker {
+  display: inline-block;
+  padding: 4rpx 18rpx;
+  background: linear-gradient(135deg, #8b6914, #d4a856);
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1a1008;
+  letter-spacing: 4rpx;
+  margin-bottom: 18rpx;
+}
+
+/* 大结局正文：28rpx 米金 + 2 行距 + 2rpx 字距（比普通气泡更舒展有诗意） */
+.ending-text {
+  font-size: 28rpx;
+  color: #e8d5a0;
+  line-height: 2;
+  letter-spacing: 2rpx;
+  display: inline;
+}
+
+/* 大结局按钮：加宽到 400rpx */
+.ending-btn {
+  width: 400rpx;
+}
+
+.keju-actions.one-col .ending-btn {
+  width: 400rpx;
+}
+
+/* ========== 12. 悬浮调试面板（开发用：左上角红色 FAB + 可滚动错误日志面板；支持闪退前日志复制给开发者）========== */
+/* 调试 FAB：88rpx 红圆 (#dc2626) + 白色 3rpx 边框；z-index:99999 最高（不被任何弹窗遮挡）*/
+.debug-fab {
+  position: fixed;
+  left: 20rpx;
+  top: 120rpx;
+  z-index: 99999;
+  background: rgba(220, 38, 38, 0.92);   /* 红色 = 紧急/错误语义色 */
+  color: #fff;
+  border-radius: 50%;
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.35);
+  border: 3rpx solid #fff;
+}
+.debug-fab-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+
+/* 错误提示小圆点（有日志时右上角显示）：#fbbf24 琥珀黄 + 1.2s 呼吸提醒动画 */
+.debug-fab-dot {
+  position: absolute;
+  right: -4rpx;
+  top: -4rpx;
+  width: 22rpx;
+  height: 22rpx;
+  background: #fbbf24;
+  border-radius: 50%;
+  border: 2rpx solid #fff;
+  animation: debug-pulse 1.2s infinite;
+}
+@keyframes debug-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+}
+
+/* 调试面板遮罩：50% 黑底 */
+.debug-panel-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99998;
+}
+
+/* 调试日志面板本体：奶白 (#fffef8) + 4rpx 红边框 + 16rpx 圆角；顶部距离 220rpx，最大 70vh 高 */
+.debug-panel {
+  position: fixed;
+  left: 24rpx;
+  top: 220rpx;
+  right: 24rpx;
+  max-height: 70vh;
+  background: #fffef8;
+  border: 4rpx solid #dc2626;
+  border-radius: 16rpx;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.3);
+}
+
+/* 面板红色标题栏（左标题+右关闭）：#dc2626 红底白字 */
+.debug-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 12rpx 12rpx 0 0;
+}
+.debug-panel-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  flex: 1;
+}
+.debug-panel-close {
+  font-size: 44rpx;
+  line-height: 1;
+  padding: 0 12rpx;
+  color: #fff;
+  font-weight: 300;
+}
+
+/* 可滚动日志体：flex:1 占据剩余高度，最大 54vh */
+.debug-panel-body {
+  flex: 1;
+  padding: 16rpx 20rpx;
+  max-height: 54vh;
+}
+
+/* 空状态提示：绿色 #059669 粗体居中（无错误时展示）*/
+.debug-panel-empty {
+  padding: 40rpx 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #059669;
+  font-weight: 700;
+}
+
+/* 自动化报告卡片：青蓝渐变底 + 青色边框（清爽技术感配色）*/
+.autotest-report {
+  margin: 16rpx;
+  padding: 20rpx;
+  background: linear-gradient(135deg, #ecfeff 0%, #f0fdf4 100%);
+  border: 2rpx solid #22d3ee;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(34, 211, 238, 0.15);
+}
+.autotest-report-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #0891b2;
+  margin-bottom: 16rpx;
+  text-align: center;
+}
+.autotest-report-text {
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #134e4a;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 单条错误日志卡：#fef2f2 淡红底 + 1rpx 淡红边 10rpx 圆角 */
+.debug-log-item {
+  background: #fef2f2;
+  border: 1rpx solid #fecaca;
+  border-radius: 10rpx;
+  padding: 14rpx 16rpx;
+  margin-bottom: 16rpx;
+}
+.debug-log-time {
+  font-size: 20rpx;
+  color: #b91c1c;   /* 暗红色 = 错误时间戳 */
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+.debug-log-content {
+  font-size: 22rpx;
+  color: #1f2937;   /* 深灰正文可读 */
+  line-height: 1.5;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+  width: 100%;
+  display: block;
+}
+
+/* 「一键复制全部日志」底部栏：#fff7ed 浅橙底 + #c2410c 橙色粗字 + 虚线分割线 */
+.debug-panel-footer {
+  padding: 18rpx 24rpx;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 24rpx;
+  font-weight: 700;
+  text-align: center;
+  border-top: 2rpx dashed #fdba74;
+  border-radius: 0 0 12rpx 12rpx;
+}
+
+/* ============ 13. 越王庙「谒王访贤」任务弹窗样式（复用 keju-panel 基础，扩展专属样式）============ */
+
+/* 任务标题加大号（52rpx 字 + 12rpx 间距，比科举标题更庄严）*/
+.temple-title {
+  font-size: 52rpx;
+  letter-spacing: 12rpx;
+}
+
+/* 三问问题列表容器：16/10rpx 内边距 */
+.temple-questions {
+  padding: 16rpx 10rpx;
+  margin-bottom: 16rpx;
+}
+
+/* 单题条目：数字圆圈 + 题目文字横向对齐，下间距 22rpx */
+.temple-question-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 22rpx;
+  gap: 14rpx;
+}
+
+.temple-question-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 题号圆圈（壹/贰/叁）：52rpx 圆 + 金边 + 8% 金底半透 + 26rpx 金色粗体 */
+.temple-q-num {
+  flex-shrink: 0;
+  width: 52rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #d4a856;
+  border: 2rpx solid rgba(212, 168, 86, 0.5);
+  border-radius: 50%;
+  background: rgba(212, 168, 86, 0.08);
+}
+
+/* 题目文字：28rpx 米金 + 1.6 行距 */
+.temple-q-text {
+  flex: 1;
+  font-size: 28rpx;
+  color: #e8d5a0;
+  line-height: 1.6;
+  letter-spacing: 1rpx;
+  padding-top: 8rpx;
+}
+
+/* 答题提示卡片：6% 金底半透 + 15% 金边 + 10rpx 圆角（"💡 场区内有答案…"）*/
+.temple-hint-wrap {
+  text-align: center;
+  margin-bottom: 24rpx;
+  padding: 12rpx 16rpx;
+  background: rgba(212, 168, 86, 0.06);
+  border-radius: 10rpx;
+  border: 1rpx solid rgba(212, 168, 86, 0.15);
+}
+
+.temple-hint {
+  font-size: 22rpx;
+  color: #b8923f;    /* 暗金色提示文字 */
+  line-height: 1.5;
+}
+
+/* 作答三题区域容器：10rpx 上下内边距 */
+.temple-quiz-section {
+  padding: 10rpx 0;
+  margin-bottom: 10rpx;
+}
+
+.temple-quiz-item {
+  margin-bottom: 28rpx;
+}
+
+.temple-quiz-item:last-child {
+  margin-bottom: 8rpx;
+}
+
+/* 单题问题标题：26rpx 金粗体 + 12rpx 下边距 */
+.temple-quiz-question {
+  font-size: 26rpx;
+  color: #d4a856;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+  letter-spacing: 1rpx;
+  line-height: 1.6;
+}
+
+/* 三问单独输入框：18/22 内边距 + 5% 白半透 + 30% 金边 */
+.temple-input-wrap {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.temple-input {
+  width: 100%;
+  padding: 18rpx 22rpx;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1rpx solid rgba(212, 168, 86, 0.3);
+  border-radius: 10rpx;
+  font-size: 26rpx;
+  color: #e8d5a0;
+  box-sizing: border-box;
+}
+
+/* 结果分数显示：28rpx 暗金 + 4rpx 字距居中 */
+.temple-score-display {
+  font-size: 28rpx;
+  color: #b8923f;
+  margin-bottom: 20rpx;
+  text-align: center;
+  letter-spacing: 4rpx;
+  z-index: 2;
+}
+
+/* 错题解析区：6% 金底半透 + 20% 金边 12rpx 圆角 */
+.temple-wrong-details {
+  width: 100%;
+  padding: 18rpx 22rpx;
+  margin-bottom: 24rpx;
+  background: rgba(212, 168, 86, 0.06);
+  border: 1rpx solid rgba(212, 168, 86, 0.2);
+  border-radius: 12rpx;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+.temple-wrong-title {
+  display: block;
+  font-size: 24rpx;
+  color: #d4a856;    /* 金色标题「📖 错题解析：」 */
+  font-weight: 700;
+  margin-bottom: 10rpx;
+  letter-spacing: 2rpx;
+}
+
+.temple-wrong-text {
+  display: block;
+  font-size: 22rpx;
+  color: #c4a45a;    /* 略亮米金正文（比标题稍暗一级） */
+  line-height: 1.7;
+  letter-spacing: 1rpx;
+  white-space: pre-line;   /* 支持\n换行展示多条错题答案 */
+}

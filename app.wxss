@@ -1,0 +1,33 @@
+/**
+ * ============================================================================
+ *  赵佗历史文化之旅 · 全局样式表 (Global Stylesheet)
+ * ============================================================================
+ *
+ *  本文件定义跨页面共享的全局样式规则，所有 page 的 wxss 都会自动继承这里的样式。
+ *
+ *  【样式分层原则】
+ *   · 通用标签重置（page、容器） → 写在 app.wxss
+ *   · 页面专属样式（对话框、按钮、景点卡片） → 写在对应页面的 page.wxss
+ *   · 复用性高的组件（静音按钮、弹窗布局） → 目前直接拷贝在两个页面 wxss
+ *     （若后续拆组件可迁移至独立 component wxss）
+ * ============================================================================
+ */
+
+/* page 根节点：撑满整个视口，为页面容器提供 100% 高度基准 */
+page {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica,
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+/* 通用 Flex 居中容器（兼容微信官方 demo 用法）
+   ⚠️  本项目 map-explore / chat 页均使用了自定义布局，
+       此 class 目前仅 index 首页会用到，保留以保证页面完整性。 */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 100vh;
+}

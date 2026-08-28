@@ -1,0 +1,234 @@
+<!-- ========================================================================
+     【佗城·赵佗历史文化之旅】地图探索页模板结构 (map-explore.wxml)
+     ------------------------------------------------------------------------
+     页面层级结构（由上至下的渲染顺序，z-index 越大越靠前）：
+       ① 根容器 <view class="map-page">
+       ② 右上角静音按钮 <view class="mute-btn"> ............. z-index:9999（最顶层）
+       ③ 开场引导层 <view class="intro-mask"> ............... z-index:999
+       ④ 主地图层 <view class="main-layer"> ................. z-index 基础层
+           ├─ 顶部信息栏 <view class="page-header-bar">
+           ├─ 地图滚动区 <scroll-view class="scroll-area">
+           │    └─ 地图包裹层 <view class="map-wrapper">
+           │         ├─ 底图 <image class="base-map">
+           │         ├─ 透明打卡热区 <block wx:for="{{spots}}"> ... </block>
+           │         └─ NPC 赵佗角色 <view class="npc-character">
+           ├─ 景点剧情对话框 <view class="story-dialog">
+           ├─ 右下角悬浮工具栏 <view class="floating-toolbar">
+           └─ 起点剧情弹窗（赵佗虚影）<view class="start-popup-mask"> ... z-index:500
+     ======================================================================== -->
+<view class="map-page">
+
+  <!-- ========== 【区块①】右上角静音/有声切换按钮 ==========
+       · z-index: 9999，全页面最顶层，任何时刻都可点击
+       · 绑定 toggleMute：点击切换 isMuted 状态，并在静音时立即 stop 当前 TTS
+       · catchtouchmove="noop"：防止用户拖动按钮时误触发下层地图滚动（防止点击穿透拖拽）
+       · 内部两套子结构：mute-icon-sound（有声=铃铛+三层声波动画）/ mute-icon-mute（静音=铃铛+红色斜杠）
+  -->
+  <view class="mute-btn" bindtap="toggleMute" catchtouchmove="noop">
+    <view wx:if="{{!isMuted}}" class="mute-icon-sound">
+      <view class="sound-wave w1"></view>
+      <view class="sound-wave w2"></view>
+      <view class="sound-wave w3"></view>
+      <view class="sound-bell"></view>
+    </view>
+    <view wx:else class="mute-icon-mute">
+      <view class="sound-wave w1"></view>
+      <view class="sound-wave w2"></view>
+      <view class="sound-wave w3"></view>
+      <view class="sound-bell"></view>
+      <view class="sound-slash"></view>
+    </view>
+  </view>
+
+  <!-- ========== 【区块②】开场引导层（赵佗「接旨入城」引导） ==========
+       · z-index: 999，进入页面时默认显示（introVisible=true），用户点按钮后淡出
+       · intro-fade-in/intro-fade-out 通过 opacity 控制显示状态 + pointer-events 控制交互穿透
+       · catchtouchmove="noop"：遮罩内滑动绝不穿透到下方地图（防止误操作）
+       · 内部结构：背景遮罩(intro-mask-bg) → 卷轴装饰线(上下各一) → 赵佗头像+光晕 → 标题 → 对白框(打字机) → 入场按钮
+  -->
+  <view class="intro-mask {{introVisible ? 'intro-fade-in' : 'intro-fade-out'}}" catchtouchmove="noop">
+    <!-- 背景径向渐变遮罩（纯视觉层，不参与交互） -->
+    <view class="intro-mask-bg"></view>
+    <!-- 引导面板主体（卷轴风格居中容器） -->
+    <view class="intro-panel">
+      <!-- 卷轴上下装饰线：仿古代卷轴两端封边效果 -->
+      <view class="intro-scroll-decoration top"></view>
+      <view class="intro-scroll-decoration bottom"></view>
+
+      <!-- 赵佗圆形头像 + 背后呼吸光晕（头像叠 z-index:2 之上，光晕 z-index:1 在背后） -->
+      <image class="intro-npc" src="/images/zhaotuo-avatar.png" mode="aspectFit" />
+      <view class="intro-npc-glow"></view>
+
+      <!-- 开场标题：南越王·赵佗 -->
+      <view class="intro-title">南越王 · 赵佗</view>
+
+      <!-- 对白框：打字机逐字呈现引导语(INTRO_TEXT)，末尾显示闪烁光标 -->
+      <view class="intro-dialog-box">
+        <text class="intro-dialog-text">{{typewriterText}}<text class="cursor" wx:if="{{showCursor}}">|</text></text>
+      </view>
+
+      <!-- 「接旨入城」按钮：仅当打字机完成全部文字输出(showEnterBtn=true)后才出现，
+           点击 onEnterCity：淡出引导层 + 震动短反馈 + 进入主地图交互 -->
+      <view class="intro-btn-wrap" wx:if="{{showEnterBtn}}">
+        <button class="intro-enter-btn" bindtap="onEnterCity">
+          <text class="btn-text">接 旨 入 城</text>
+          <view class="btn-glow"></view>
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 【区块③】主地图层（核心交互区） ==========
+       · 引导层显示时加 .hidden（display:none）完全隐藏不占位；引导消失后加 .visible 淡入
+       · flex 纵向布局：顶部信息栏固定高度 + 滚动区 flex:1 自适应
+  -->
+  <view class="main-layer {{introVisible ? 'hidden' : 'visible'}}">
+
+    <!-- ③-1 顶部信息栏：左侧标题副标题 + 右侧打卡进度胶囊 -->
+    <view class="page-header-bar">
+      <view class="header-left">
+        <text class="header-title">佗城·赵佗历史文化之旅</text>
+        <text class="header-sub">探秘南越古城 · 解锁千年历史</text>
+      </view>
+      <!-- 打卡进度胶囊：checkedCount（0-6）/ 6 大景点 -->
+      <view class="header-progress">
+        <text class="progress-num">{{checkedCount}}/6</text>
+        <text class="progress-label">打卡进度</text>
+      </view>
+    </view>
+
+    <!-- ③-2 地图滚动区（scroll-view）：支持 x/y 双方向滚动，隐藏原生滚动条
+         · scroll-view 内所有热区和 NPC 统一放在 map-wrapper 中，
+           用绝对百分比定位锚定，保证不同机型下坐标匹配 -->
+    <scroll-view scroll-y scroll-x class="scroll-area" show-scrollbar="{{false}}">
+      <view class="map-wrapper">
+        <!-- ③-2-1 背景底图：widthFix 模式撑满屏幕宽度，高度随图片原始比例自适应 -->
+        <image src="/images/tuocheng-map.jpg" mode="widthFix" class="base-map"></image>
+
+        <!-- ③-2-2 透明打卡热区（循环渲染 spots 数组）
+             · 每个热区 left/top 对应地图上景点的百分比坐标
+             · 三态样式组合：
+                 hz-start   → 起点专属蓝金光圈
+                 hz-pending → 未打卡（金色呼吸光圈）
+                 hz-checked → 已打卡（金色✔勾）
+                 hz-active  → 当前激活（朱红色加强光晕，由 activeSpot === spot.id 决定）
+             · data-id="{{spot.id}}" + bindtap="onNodeTap"：把 id 传给 visitSpot 触发 NPC 飞行动画
+        -->
+        <block wx:for="{{spots}}" wx:key="id" wx:for-item="spot">
+          <view class="hotspot {{spot.isStart ? 'hz-start' : ''}} {{spot.checked ? 'hz-checked' : 'hz-pending'}} {{activeSpot === spot.id ? 'hz-active' : ''}}"
+                style="left: {{spot.left}}; top: {{spot.top}};"
+                data-id="{{spot.id}}"
+                bindtap="onNodeTap">
+            <view class="hz-check" wx:if="{{spot.checked && !spot.isStart}}">✔</view>
+          </view>
+        </block>
+
+        <!-- ③-2-3 NPC 赵佗角色（和热区同一百分比坐标系）
+             · pointer-events: none（样式层）—— 点击穿透到下面的热区
+             · 4 层视觉结构（由下至上）：
+                 npc-aura      → 背后古铜金呼吸光晕（神性视觉）
+                 npc-shadow    → 脚下椭圆黑影（浮动时同步缩放）
+                 npc-img       → 赵佗头像本体（圆形+金边+上下浮动动画）
+                 npc-label-tag → 头像下的"赵佗"名字黑底金边标签
+             · npcLeft/npcTop 通过 _safeSetData 驱动，带 0.65s 弹性过渡动画 = 瞬移飞行带路
+        -->
+        <view class="npc-character" style="left: {{npcLeft}}; top: {{npcTop}};">
+          <view class="npc-aura"></view>
+          <view class="npc-shadow"></view>
+          <image class="npc-img" src="/images/zhaotuo-avatar.png" mode="aspectFill" />
+          <view class="npc-label-tag">赵佗</view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- ③-3 景点剧情对话框（故事/介绍层）
+         · 显示条件：storyVisible=true（当前景点故事剧情展开时）
+         · story-show/story-hide：缩放 + 下移 + opacity 过渡动画
+         · 3 段式结构：
+             dialog-scroll-header → 龙纹三角装饰 + 景点名 + 右上角关闭×
+             dialog-content       → 剧情正文 (storyText)
+             dialog-footer        → 仅显示时渲染：「与赵佗对话」主按钮 + 「关闭」次按钮
+    -->
+    <view class="story-dialog {{storyVisible ? 'story-show' : 'story-hide'}}">
+      <view class="dialog-scroll-header">
+        <view class="dialog-dragon-left"></view>
+        <text class="dialog-spot-name">{{storySpotName}}</text>
+        <view class="dialog-dragon-right"></view>
+        <!-- catchtap 防止点击 × 时冒泡到 dialog 本体 -->
+        <view class="dialog-x" catchtap="onCloseStory">×</view>
+      </view>
+      <view class="dialog-content">
+        <text class="dialog-story-text">{{storyText}}</text>
+      </view>
+      <view class="dialog-footer" wx:if="{{storyVisible}}">
+        <button class="dialog-action-btn primary" bindtap="onEnterChat">与赵佗对话</button>
+        <button class="dialog-action-btn secondary" bindtap="onCloseStory">关闭</button>
+      </view>
+    </view>
+
+    <!-- ③-4 右下角悬浮工具栏（z-index:200）
+         · 5 个工具按钮 + 1 条分隔线，纵向排列
+         · hover-class="tool-hover"：按下高亮反馈
+         · 功能分组：
+             【拍照探索组】tool-scan(扫一扫) / tool-chat(自由闲聊) / tool-photo(拍卡打卡)
+             --- tool-divider 分隔线 ---
+             【导航组】  tool-home(返回主页) / tool-progress(打卡进度)
+         · tool-progress 的标签直接绑定 {{checkedCount}}/6，实时反映进度
+    -->
+    <view class="floating-toolbar">
+      <view class="tool-btn tool-scan" bindtap="onToolScan" hover-class="tool-hover">
+        <view class="tool-icon">📷</view>
+        <view class="tool-label">扫一扫</view>
+      </view>
+      <view class="tool-btn tool-chat" bindtap="onToolChat" hover-class="tool-hover">
+        <view class="tool-icon">💬</view>
+        <view class="tool-label">自由闲聊</view>
+      </view>
+      <view class="tool-btn tool-photo" bindtap="onToolPhoto" hover-class="tool-hover">
+        <view class="tool-icon">📸</view>
+        <view class="tool-label">拍卡打卡</view>
+      </view>
+      <!-- 工具分组分隔线：拍照探索 ↔ 导航 -->
+      <view class="tool-divider"></view>
+
+      <view class="tool-btn tool-home" bindtap="onToolHome" hover-class="tool-hover">
+        <view class="tool-icon">🏠</view>
+        <view class="tool-label">主页</view>
+      </view>
+      <view class="tool-btn tool-progress" bindtap="onToolProgress" hover-class="tool-hover">
+        <view class="tool-icon">📜</view>
+        <view class="tool-label">{{checkedCount}}/6</view>
+      </view>
+    </view>
+
+    <!-- ③-5 起点剧情弹窗（赵佗虚影独白 + 打字机效果）
+         · z-index:500，仅当用户点击「起点」热区后才显示（startPopupVisible=true）
+         · start-show/start-hide：opacity 淡入淡出 + pointer-events 控制
+         · catchtouchmove="noop"：遮罩内拖动不穿透地图
+         · 4 段式结构：
+             start-popup-header → 赵佗虚影头像 + 蓝色光晕 + 「赵佗虚影」名
+             start-popup-body   → 打字机长独白(START_MONOLOGUE) + 闪烁光标
+             start-popup-footer → 「领命出发」按钮（仅打字完成 startShowBtn=true 后显示）
+         · wx:if="{{startPopupVisible}}" 包裹 start-popup-panel：隐藏时不渲染 DOM，减少树复杂度
+    -->
+    <view class="start-popup-mask {{startPopupVisible ? 'start-show' : 'start-hide'}}" catchtouchmove="noop">
+      <view class="start-popup-panel" wx:if="{{startPopupVisible}}">
+        <view class="start-popup-header">
+          <image class="start-popup-avatar" src="/images/zhaotuo-avatar.png" mode="aspectFill" />
+          <view class="start-popup-glow"></view>
+          <text class="start-popup-name">赵佗虚影</text>
+        </view>
+        <view class="start-popup-body">
+          <text class="start-popup-text">{{startTypewriterText}}<text class="start-cursor" wx:if="{{startShowCursor}}">|</text></text>
+        </view>
+        <view class="start-popup-footer" wx:if="{{startShowBtn}}">
+          <button class="start-popup-btn" bindtap="onCloseStartPopup">
+            <text class="start-btn-text">领命出发</text>
+            <view class="start-btn-glow"></view>
+          </button>
+        </view>
+      </view>
+    </view>
+
+  </view>
+</view>
