@@ -40,6 +40,50 @@
     </view>
   </view>
 
+  <view wx:if="{{cameraVisible}}" class="camera-mask">
+    <camera id="captureCamera" class="camera-preview" device-position="{{cameraPosition}}" flash="auto" bindinitdone="onCameraReady" binderror="onCameraError"></camera>
+    <cover-view class="camera-layer">
+      <cover-view class="camera-topbar">
+        <cover-view class="camera-close-btn" bindtap="onCloseCamera">关闭</cover-view>
+      </cover-view>
+      <cover-view class="camera-controls">
+        <cover-view class="camera-control-btn camera-switch-btn" bindtap="onSwitchCamera">切换镜头</cover-view>
+      </cover-view>
+      <cover-view class="camera-shutter-hitbox" bindtap="onTakePhoto">拍照</cover-view>
+    </cover-view>
+  </view>
+
+  <!-- 拍照完成后的照片模式：保留照片直到用户删除、保存或分享 -->
+  <view wx:if="{{photoMode}}" class="photo-mode-mask" catchtouchmove="noop">
+    <image class="photo-mode-image" src="{{photoPath}}" mode="aspectFill"></image>
+    <view class="photo-mode-topbar">
+      <text class="photo-mode-title">照片预览</text>
+      <view class="photo-mode-close" bindtap="onDeletePhoto">关闭</view>
+    </view>
+    <view class="photo-mode-actions">
+      <view class="photo-action photo-delete" bindtap="onDeletePhoto">删除</view>
+      <view class="photo-action photo-save" bindtap="onSavePhoto">保存至相册</view>
+      <button class="photo-action photo-share" open-type="share">分享</button>
+    </view>
+  </view>
+
+  <!-- 阅卷环境配置弹窗：确认后才进入赵佗欢迎引导，避免未配置环境触发网络请求 -->
+  <view wx:if="{{reviewConfigVisible}}" class="review-config-mask" catchtouchmove="noop">
+    <view class="review-config-modal">
+      <view class="review-config-rule"></view>
+      <text class="review-config-title">本地运行配置指南</text>
+      <text class="review-config-text">当前版本为开源与比赛提交版。为保障云资源与密钥安全，代码已隐去真实 API Key；实际商用部署时，将由系统后台统一配置调用鉴权。</text>
+      <text class="review-config-text config-emphasis">若需深度体验完整的“AI 剧情对话”与“原声讲解”功能，请按以下步骤配置：</text>
+      <text class="review-config-text"><text class="config-step">1. 获取密钥：</text>前往“阿里云百炼控制台”获取 API Key，并务必开通 <text class="config-code">cosyvoice-v3-flash</text> 语音模型的调用权限。</text>
+      <text class="review-config-text"><text class="config-step">2. 填写配置：</text></text>
+      <text class="review-config-text config-indent"><text class="config-step">前端：</text>打开 Frontend_MiniProgram/pages/chat/chat.js，在顶部填入 API Key。</text>
+      <text class="review-config-text config-indent"><text class="config-step">后端：</text>打开 Backend_Service/server.py，填入 API Key。</text>
+      <text class="review-config-text"><text class="config-step">3. 启动服务：</text>进入 Backend_Service/ 目录，在终端运行 python server.py 启动本地语音代理。</text>
+      <button class="review-config-confirm" bindtap="onConfirmReviewConfig">已知晓，进入系统体验</button>
+      <text class="review-config-footnote">注：若跳过上述配置，您仍可正常浏览界面交互与全景动线，仅 AI 对话及语音功能受限。</text>
+    </view>
+  </view>
+
   <!-- ========== 【区块②】开场引导层（赵佗「接旨入城」引导） ==========
        · z-index: 999，进入页面时默认显示（introVisible=true），用户点按钮后淡出
        · intro-fade-in/intro-fade-out 通过 opacity 控制显示状态 + pointer-events 控制交互穿透
@@ -166,13 +210,13 @@
       </view>
     </view>
 
-    <!-- ③-4 右下角悬浮工具栏（z-index:200）
-         · 5 个工具按钮 + 1 条分隔线，纵向排列
+        <!-- ③-4 右下角悬浮工具栏（z-index:200）
+          · 4 个工具按钮 + 1 条分隔线，纵向排列
          · hover-class="tool-hover"：按下高亮反馈
          · 功能分组：
              【拍照探索组】tool-scan(扫一扫) / tool-chat(自由闲聊) / tool-photo(拍卡打卡)
              --- tool-divider 分隔线 ---
-             【导航组】  tool-home(返回主页) / tool-progress(打卡进度)
+             【进度组】  tool-progress(打卡进度)
          · tool-progress 的标签直接绑定 {{checkedCount}}/6，实时反映进度
     -->
     <view class="floating-toolbar">
@@ -191,10 +235,6 @@
       <!-- 工具分组分隔线：拍照探索 ↔ 导航 -->
       <view class="tool-divider"></view>
 
-      <view class="tool-btn tool-home" bindtap="onToolHome" hover-class="tool-hover">
-        <view class="tool-icon">🏠</view>
-        <view class="tool-label">主页</view>
-      </view>
       <view class="tool-btn tool-progress" bindtap="onToolProgress" hover-class="tool-hover">
         <view class="tool-icon">📜</view>
         <view class="tool-label">{{checkedCount}}/6</view>

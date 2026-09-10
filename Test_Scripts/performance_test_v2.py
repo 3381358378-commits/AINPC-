@@ -18,8 +18,10 @@ import sys
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TTS_SERVER = "http://127.0.0.1:5001"
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "tts_cache")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TTS_SERVER = "http://127.0.0.1:5006"
+CACHE_DIR = os.path.join(PROJECT_ROOT, "Backend_Service", "tts_cache")
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "performance_test_report.txt")
 
 # 使用tts_cache中已有的真实音频文件对应的文本
 # 这些是之前成功生成的音频，可以直接用于缓存测试
@@ -704,7 +706,7 @@ def main():
     print(report_text)
 
     # 保存报告
-    with open("performance_test_report.txt", "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report_text)
     print(f"\n✅ 报告已保存至: performance_test_report.txt")
 

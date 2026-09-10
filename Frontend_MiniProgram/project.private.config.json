@@ -1,6 +1,6 @@
 {
   "libVersion": "3.17.0",
-  "projectname": "ZhaoTuo_MiniProgram",
+  "projectname": "Frontend_MiniProgram",
   "setting": {
     "urlCheck": false,
     "coverView": true,
@@ -10,6 +10,12 @@
     "autoAudits": false,
     "showShadowRootInWxmlPanel": true,
     "compileHotReLoad": true,
-    "bigPackageSizeSupport": false
+    "bigPackageSizeSupport": false,
+    "useApiHook": true,
+    "useStaticServer": false,
+    "useLanDebug": false,
+    "showES6CompileOption": false,
+    "checkInvalidKey": true,
+    "ignoreDevUnusedFiles": true
   }
 }

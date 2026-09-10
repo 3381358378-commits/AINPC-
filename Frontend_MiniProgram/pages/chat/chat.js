@@ -122,12 +122,9 @@
 //   API_KEY           ：用户在阿里云百炼/控制台创建的 API Key (sk- 前缀)
 //   MODEL_NAME        ：纯文本对话模型 = qwen-plus（支持中文、古文语境）
 //   VISION_MODEL_NAME ：多模态视觉模型 = qwen-vl-max（越王井拍照看图答题用）
+// ============ 通义千问 API 配置 ============
 const API_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-// ============================================================================
-// ⚠️ 【开源前必做】请将下方 API_KEY 替换为你自己在阿里云百炼控制台申请的密钥：
-//    申请地址：https://bailian.console.aliyun.com/ → API-KEY 管理 → 创建新密钥
-//    格式：sk-ws-xxxxx 或 sk-xxxxx（DashScope 新版密钥）
-// ============================================================================
+// 将你的真实 API Key 加上单引号或双引号，直接赋值给变量
 const API_KEY = 'YOUR_DASHSCOPE_API_KEY_HERE'
 const MODEL_NAME = 'qwen-plus'
 const VISION_MODEL_NAME = 'qwen-vl-max'  // 多模态视觉模型
@@ -599,6 +596,8 @@ Page({
     kejuResultTyping: false,      //   点评文案打字中 → 显示光标
     kejuAwardTitle: '',           //   称号大字：状元/进士/贡士/举人
     kejuAwardText: '',            //   称号副标题
+    kejuReviewPage: 0,             //   科举复盘当前页：0乡试/1会试/2殿试/3称号
+    kejuReviewPages: [],           //   三题答案解析页数据
 
     // ── 越王庙"谒王访贤" 3 弹窗 (WXML 模块11: 3 个 wx:if showTemple*) ────
     showTempleTask: false,        // 弹窗A：任务介绍（3题预览 + 接受/放弃双按钮）
@@ -1404,7 +1403,7 @@ Page({
         const soundRate = (tts.triggered || 0) > 0 ? Math.round((tts.success || 0) * 100 / (tts.triggered || 1)) + '%' : 'N/A'
         ttsBody += `  声音播放成功率：${soundRate}\n`
         if ((tts.fail || 0) > 0) {
-          ttsBody += `  ⚠️ 声音失败次数>0：请检查 server.py 是否在 127.0.0.1:5001 正常启动、合法域名配置是否勾选「不校验合法域名」\n`
+          ttsBody += `  ⚠️ 声音失败次数>0：请检查 server.py 是否在 127.0.0.1:5006 正常启动、合法域名配置是否勾选「不校验合法域名」\n`
         } else {
           ttsBody += `  ✅ 声音功能检测：所有应播放声音的场景均正常播放（无中断/无丢失）\n`
         }
@@ -1523,6 +1522,7 @@ Page({
   //     清下载超时定时器 → 触发 onDone → 取队列下一条延迟 250ms 衔接
   //     （250ms 延迟：给底层解码线程释放完全，杜绝野指针闪退）。
   // ============================================================================
+  // 双门闩同步：打字机完成与 TTS 完成必须同时满足，才推进剧情或显示下一步弹窗。
   // 🔴 AI 整改点①：Base64 真机无法播放兜底——禁止直接把 data:audio/...;base64 赋给 InnerAudioContext.src
   //    必须先写入 USER_DATA_PATH 临时 mp3 文件，再返回本地绝对路径
   //    兼容三种输入：wx.downloadFile 返回的 tempFilePath / data:audio/...;base64,xxx / 普通网络URL
@@ -2499,6 +2499,7 @@ Page({
    * @param {number} thinkIdx      "正在思考…"占位气泡下标，拿到 AI 回复后用 replaceMsgWithTypewriter 替换
    * @param {'text'|'image'} mode  请求模式
    */
+  // 状态机调度：根据当前景点和用户回答选择文本/视觉模型，再交给判卷与过渡流程。
   sendToQwen(textOrDataUrl, thinkIdx, mode = 'text') {
     if (!this || !this._pageAlive || this._destroyed) {
       // 页面已死：立刻显示 fallback + 解锁（不请求 API）
@@ -2962,70 +2963,60 @@ Page({
     this._safeSetData({
       showKejuIntro: false,
       showKejuXiangshi: true,
+      kejuXiangshiAnswer: '',
+      kejuHuishiAnswer: '',
+      kejuDianshiAnswer: '',
       kejuScore: { q1: false, q2: false, dianshiLevel: 0, total: 0 }
     })
   },
   /** 乡试：单选选择 → 实时高亮 */
   onXiangshiSelect(e) {
     if (!this || !this._pageAlive || this._destroyed) return
-    const opt = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.opt) || ''
-    this._safeSetData({ xiangshiSelected: opt })
+    const opt = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key) || ''
+    this._safeSetData({ kejuXiangshiAnswer: opt })
   },
-  /** 乡试「提交」：正确 B → score.q1=true → 开会试；否则直接关弹窗 → 称号「童生」→ 出结果 */
+  /** 乡试「提交」：记录对错后始终进入会试，三关完成后再统一评价和颁发称号。 */
   onXiangshiSubmit() {
     if (!this || !this._pageAlive || this._destroyed) return
     const that = this
-    const opt = (this.data && this.data.xiangshiSelected) || ''
+    const opt = (this.data && this.data.kejuXiangshiAnswer) || ''
     if (!opt) { try { wx.showToast({ title: '请先择一答案', icon: 'none' }) } catch (e) {}; return }
     const correct = (opt === 'B')
     const curScore = Object.assign({ q1: false, q2: false, dianshiLevel: 0, total: 0 }, (this.data && this.data.kejuScore) || {})
     curScore.q1 = correct
     curScore.total = (curScore.total || 0) + (correct ? 2 : 0)
-    if (!correct) {
-      // 乡试错：直接出结果
-      this._safeSetData({ showKejuXiangshi: false, kejuScore: curScore }, () => {
-        try { that._startKejuResultTypewriter(curScore, '童生') } catch (e) {}
-      })
-      return
-    }
     this._safeSetData({ showKejuXiangshi: false, showKejuHuishi: true, kejuScore: curScore })
   },
   /** 会试：用户 textarea 输入 */
   onHuishiInput(e) {
     if (!this || !this._pageAlive || this._destroyed) return
     const v = (e && e.detail && e.detail.value) || ''
-    this._safeSetData({ huishiText: v })
+    this._safeSetData({ kejuHuishiAnswer: v })
   },
-  /** 会试「提交」：关键词命中「学而优则仕」+「寒门」或「士族」 → q2=true；否则出结果「秀才」 */
+  /** 会试「提交」：记录对错后始终进入殿试，第三关结束后统一评价。 */
   onHuishiSubmit() {
     if (!this || !this._pageAlive || this._destroyed) return
     const that = this
-    const raw = String((this.data && this.data.huishiText) || '')
+    const raw = String((this.data && this.data.kejuHuishiAnswer) || '')
     const hasXue = raw.indexOf('学而优则仕') >= 0
     const hasHan = (raw.indexOf('寒门') >= 0 || raw.indexOf('士族') >= 0 || raw.indexOf('寒门士族') >= 0)
     const correct = !!(hasXue && hasHan)
     const curScore = Object.assign({ q1: false, q2: false, dianshiLevel: 0, total: 0 }, (this.data && this.data.kejuScore) || {})
     curScore.q2 = correct
     curScore.total = (curScore.total || 0) + (correct ? 2 : 0)
-    if (!correct) {
-      this._safeSetData({ showKejuHuishi: false, kejuScore: curScore }, () => {
-        try { that._startKejuResultTypewriter(curScore, '秀才') } catch (e) {}
-      })
-      return
-    }
     this._safeSetData({ showKejuHuishi: false, showKejuDianshi: true, kejuScore: curScore })
   },
   /** 殿试：用户 textarea 输入 */
   onDianshiInput(e) {
     if (!this || !this._pageAlive || this._destroyed) return
     const v = (e && e.detail && e.detail.value) || ''
-    this._safeSetData({ dianshiText: v })
+    this._safeSetData({ kejuDianshiAnswer: v })
   },
   /** 殿试「提交」：_scoreDianshiAnswer → DIANSHI_CRITERIA[4给分点] 命中数 0~4 → 转 level 0~3 → DIANSHI_SCORED_REPLIES 档取评语文案 */
   onDianshiSubmit() {
     if (!this || !this._pageAlive || this._destroyed) return
     const that = this
-    const raw = String((this.data && this.data.dianshiText) || '')
+    const raw = String((this.data && this.data.kejuDianshiAnswer) || '')
     const level = this._scoreDianshiAnswer(raw)
     const curScore = Object.assign({ q1: false, q2: false, dianshiLevel: 0, total: 0 }, (this.data && this.data.kejuScore) || {})
     curScore.dianshiLevel = level
@@ -3070,6 +3061,69 @@ Page({
     if (q1) return '举人'
     return (q2 ? '秀才' : '童生')
   },
+  _getKejuAwardText(title) {
+    const texts = {
+      '状元': '三关俱佳，文才与治国之见皆令人赞叹。',
+      '进士': '殿试见识不凡，已具入仕经世之才。',
+      '贡士': '答题颇有根基，治国之策也有可取之处。',
+      '举人': '乡试拔得头筹，已显读书人的聪慧。',
+      '秀才': '能通文理，继续磨砺定能更进一步。',
+      '童生': '虽未尽如人意，肯学肯答便值得嘉许。'
+    }
+    return texts[title] || '今日一试已有所得，继续前行，必有长进。'
+  },
+  _buildKejuReviewPages(score, title) {
+    const s = score || {}
+    const selected = String(this.data.kejuXiangshiAnswer || '')
+    const xiangshiOption = (KEJU_XIANGSHI_QUESTION.options || []).find(item => item.key === selected)
+    const xiangshiAnswer = xiangshiOption ? xiangshiOption.label : '未作答'
+    const huishiAnswer = String(this.data.kejuHuishiAnswer || '').trim() || '未作答'
+    const dianshiAnswer = String(this.data.kejuDianshiAnswer || '').trim() || '未作答'
+    const dianshiLevel = Number(s.dianshiLevel) || 0
+    const hitText = dianshiLevel >= 3 ? '命中 4 项治理要点。' : dianshiLevel === 2 ? '命中 3 项治理要点。' : dianshiLevel === 1 ? '命中 2 项治理要点。' : '命中 0-1 项治理要点。'
+    return [
+      {
+        stage: '第一关 · 乡试',
+        question: KEJU_XIANGSHI_QUESTION.question,
+        answer: '标准答案：B. 光绪二年',
+        userAnswer: '你的作答：' + xiangshiAnswer,
+        analysis: s.q1 ? '答对！光绪二年（1876年）建成，是广东现存的重要清代科考场所。小友身在考棚，可浏览现场格局与碑刻，从眼前的文脉遗存中继续寻找答案。' : '本题答案为光绪二年（1876年），考棚见证了岭南古代教育与科举文脉。小友不妨在考棚中走走看看，从建筑、楹联与展陈里寻找历史线索。'
+      },
+      {
+        stage: '第二关 · 会试',
+        question: KEJU_HUISHI_QUESTION.question,
+        answer: '标准答案：学而优则仕哪问寒门士族',
+        userAnswer: '你的作答：' + huishiAnswer,
+        analysis: s.q2 ? '答对！这副对联表达了不问出身、重视才学的科举理想。小友可细看考棚门联，在游览现场体会古人求学入仕的志向。' : '完整上句为“学而优则仕哪问寒门士族”，强调求学进取与不拘门第。请在考棚中浏览门楼与楹联，从现场文字中找寻答案。'
+      },
+      {
+        stage: '第三关 · 殿试',
+        question: KEJU_DIANSHI_QUESTION.question,
+        answer: '参考答案：和辑百越、传播中原技术、移民实边、两度归汉。',
+        userAnswer: '你的作答：' + dianshiAnswer,
+        analysis: hitText + '赵佗评曰：' + (DIANSHI_SCORED_REPLIES[dianshiLevel] || '勤学善思，仍有提升空间。') + '小友还可在考棚中走访浏览，将现场所见与史料相互印证，慢慢找寻属于自己的答案。'
+      },
+      {
+        stage: '科举评定',
+        question: '三关试毕，今日成绩已定。',
+        answer: '所得称号：' + title,
+        userAnswer: '',
+        analysis: this._getKejuAwardText(title) + ' 莫因一题得失自限，肯走完三关、敢于作答，便是今日最大的收获。'
+      }
+    ]
+  },
+  onKejuReviewChange(e) {
+    const current = Number(e && e.detail && e.detail.current) || 0
+    this._safeSetData({ kejuReviewPage: current })
+  },
+  onKejuReviewPrev() {
+    const current = Math.max(0, (Number(this.data.kejuReviewPage) || 0) - 1)
+    this._safeSetData({ kejuReviewPage: current })
+  },
+  onKejuReviewNext() {
+    const current = Math.min(3, (Number(this.data.kejuReviewPage) || 0) + 1)
+    this._safeSetData({ kejuReviewPage: current })
+  },
   /**
    * 结果弹窗打字机：70ms/字 → 拼接"恭喜得中【XX】+ DIANSHI_SCORED_REPLIES[档] 评语文案"
    *  完成 → 「返回巡游」按钮 → onKejuResultDone 追加过渡到苏堤
@@ -3077,13 +3131,20 @@ Page({
   _startKejuResultTypewriter(score, title) {
     if (!this || !this._pageAlive || this._destroyed) return
     const level = Number(score && score.dianshiLevel) || 0
-    const replies = DIANSHI_SCORED_REPLIES && Array.isArray(DIANSHI_SCORED_REPLIES) ? DIANSHI_SCORED_REPLIES : ['略有小误，再接再厉。', '尚可，尚有可造之处。', '深得朕意，才华横溢。', '状元之资，天下无双！']
-    const feedback = (replies[level] != null) ? replies[level] : replies[replies.length - 1]
+    const fallbackReplies = ['略有小误，再接再厉。', '尚可，尚有可造之处。', '深得朕意，才华横溢。', '状元之资，天下无双！']
+    const feedback = (DIANSHI_SCORED_REPLIES && DIANSHI_SCORED_REPLIES[level] != null)
+      ? DIANSHI_SCORED_REPLIES[level]
+      : fallbackReplies[Math.min(level, fallbackReplies.length - 1)]
     const text = '恭喜得中【' + String(title || '童生') + '】！' + String(feedback || '')
+    const awardTitle = String(title || '童生')
     this._safeSetData({
       showKejuResult: true,
       kejuResultText: '',
-      kejuResultTitle: String(title || '童生'),
+      kejuResultTitle: awardTitle,
+      kejuAwardTitle: awardTitle,
+      kejuAwardText: this._getKejuAwardText(awardTitle),
+      kejuReviewPage: 0,
+      kejuReviewPages: this._buildKejuReviewPages(score, awardTitle),
       kejuResultTyping: true
     })
     const that = this
@@ -3278,11 +3339,11 @@ Page({
     if (!spotKey) { this._safeSetData({ showTransitionPopup: false }); return }
     try {
       const app = getApp && getApp()
-      if (app && app._memoryStorage) {
-        const s = app._memoryStorage
-        const list = JSON.parse(s.getItem('visitedSpots') || '[]') || []
+      if (app && app.safeGetStorageSync && app.safeSetStorageSync) {
+        const stored = app.safeGetStorageSync('visitedSpots') || []
+        const list = Array.isArray(stored) ? stored : []
         if (list.indexOf(spotKey) < 0) list.push(spotKey)
-        s.setItem('visitedSpots', JSON.stringify(list))
+        app.safeSetStorageSync('visitedSpots', list)
         this._visitedSpots = list
       }
     } catch (eVis) {}
@@ -3297,7 +3358,8 @@ Page({
         introSpotName: intro.name || spotKey,
         introSpotSubtitle: intro.subtitle || '',
         introTypewriterText: '',
-        introFullText: String(intro.intro || ''),
+        // SPOT_INTROS 使用 content 字段；兼容旧数据的 intro 字段，避免介绍正文为空。
+        introFullText: String(intro.content || intro.intro || ''),
         showIntroBtn: false
       }, () => {
         try { that.startIntroTypewriter() } catch (e) { console.error('[景点介绍] 打字机异常：' + (e && e.stack ? e.stack : e)) }
@@ -3347,6 +3409,7 @@ Page({
   },
 
   // ============ §32 triggerSpotVisit：景点首句硬编码（跳过AI），考棚 / 越王庙 / 普通景点 三分支 ============
+  // 景点状态机入口：固定触发台词先行，特殊景点进入任务，其余景点进入对话判卷。
   triggerSpotVisit(spotName) {
     if (!this || !this._pageAlive || this._destroyed) return
     const spot = String(spotName || '').trim()

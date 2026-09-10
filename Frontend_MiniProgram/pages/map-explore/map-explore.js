@@ -14,7 +14,7 @@
  *  技术栈
  * ============================================================
  *  - 框架：      微信原生小程序 (WXML / WXSS / WXS / Page 生命周期)
- *  - 音频：      wx.createInnerAudioContext + wx.downloadFile (自建 Python TTS 服务 server.py:5001)
+ *  - 音频：      wx.createInnerAudioContext + wx.downloadFile (自建 Python TTS 服务 server.py:5006)
  *  - 数据持久：  App 级内存 SafeStorage (safeGetStorageSync) —— 避开 wx.Storage 3.17.0 灰度 WAWorker 原生崩溃
  *  - 特效：      CSS 呼吸/浮动/淡入动画 + setInterval 打字机 + cubic-bezier 弹性过渡(NPC飞行)
  *  - 闪退防护：  9 大加固体系（详见下方「闪退防护设计总览」）
@@ -28,7 +28,7 @@
  *   3. 起点剧情：点击起点热区 → 弹出赵佗虚影独白（START_MONOLOGUE 打字机 + TTS）
  *   4. 景点跳转：点击 6 大景点热区 → NPC 飞行动画 → 跳转 chat 页带景点名 query
  *   5. TTS 播放队列：playTTS → _finishOneTts → queue.shift 全链路防闪退实现
- *   6. 工具栏 5 项：扫一扫(扫码打卡/手动选景) / 自由闲聊 / 拍卡打卡 / 主页 / 进度查看
+ *   6. 工具栏 4 项：扫一扫(扫码打卡/手动选景) / 自由闲聊 / 拍卡打卡 / 进度查看
  *   7. 资源全清理：onUnload 7 类资源 (timer/interval/ctx/downloadTask/queue) 全回收
  *
  * ============================================================
@@ -109,7 +109,7 @@ const _ENABLE_TTS_AUDIO = true
 const _TTS_VERBOSE_LOG = true
 // ⚠️ 电脑开发者工具模拟器测试：默认用 127.0.0.1（本机回环，最稳，不需要 WiFi）
 //    如需手机真机扫码测试：把 127.0.0.1 改成你电脑局域网 IPv4 地址（PowerShell 运行 ipconfig 查 WLAN IPv4）
-const TTS_SERVER_URL = 'http://127.0.0.1:5001'
+const TTS_SERVER_URL = 'http://127.0.0.1:5006'
 
 // 打字机速度：235ms/字（全局统一，和 chat.js 保持一致）
 // 为什么是 235ms？—— 经验值：180ms 以下阅读体验偏快，260ms 以上偏拖沓；
@@ -163,7 +163,8 @@ Page({
   /**
    * @type {Object} data
    * @description 页面响应式数据（和 WXML {{}} 绑定的字段说明）
-   *  - introVisible / typewriterText / showCursor / showEnterBtn —— 开场引导打字机状态
+  *  - reviewConfigVisible —— 首次进入时显示阅卷环境配置说明
+  *  - introVisible / typewriterText / showCursor / showEnterBtn —— 开场引导打字机状态
    *  - spots —— 7 个热区完整状态数组（left/top/checked 都已同步渲染）
    *  - npcLeft / npcTop —— NPC 赵佗当前百分比坐标（驱动 transition 飞行动画）
    *  - activeSpot —— 当前激活热区 id（决定哪个热区加 hz-active 朱红光晕）
@@ -174,6 +175,12 @@ Page({
    *  - _typeTimer / _startTypeTimer —— 两个打字机的 setInterval 句柄（onUnload 统一清理）
    */
   data: {
+    reviewConfigVisible: true,
+    cameraVisible: false,
+    cameraPosition: 'back',
+    photoMode: false,
+    photoPath: '',
+    cameraReady: false,
     introVisible: true,
     typewriterText: '',
     showCursor: true,
@@ -203,7 +210,7 @@ Page({
    *   2. 初始化 _allTimeoutHandles 集合（闪退加固 C）
    *   3. 重置 TTS 上下文/队列/下载超时（防止 Page 实例被基础库复用后残留 _isTtsPlaying=true 锁死）
    *   4. 把 SPOT_DATA 深拷贝为 spots（避免原常量被意外修改），走 _safeSetData 写入
-   *   5. 启动开场引导打字机 + TTS
+  *   5. 等待评委确认配置说明，确认后再启动开场引导打字机 + TTS
    */
   onLoad() {
     // ========== 【页面存活标记】核心修复：与chat.js一致，防止页面销毁后异步回调setData ==========
@@ -236,8 +243,17 @@ Page({
     const spots = SPOT_DATA.map(s => ({ ...s }))
     // 【走_safeSetData】避免onLoad初始化问题
     this._safeSetData({ spots })
-    // 启动开场引导打字机（顺带调 playTTS 播放语音）
-    this.startTypewriter()
+    // 首次进入先展示配置说明；用户确认后由 onConfirmReviewConfig 启动欢迎页。
+  },
+
+  /**
+   * 【阅卷环境确认】关闭配置说明，进入原有赵佗欢迎引导。
+   * 网络请求和 TTS 均延迟到用户完成知情确认后，避免未配置环境时产生误报。
+   */
+  onConfirmReviewConfig() {
+    this._safeSetData({ reviewConfigVisible: false }, () => {
+      this.startTypewriter()
+    })
   },
 
   /**
@@ -1390,31 +1406,103 @@ Page({
 
   /**
    * @function onToolPhoto
-   * @description 工具栏「拍卡打卡」按钮：TODO 项占位。
-   *   功能规划：调起相机拍一张当前景点照 → 叠加赵佗主题相框 → 合成一张「打卡卡」存相册 + 分享。
-   *   目前仅展示占位 Toast，等相机权限 + Canvas 合成模块开发完成后接入。
+  * @description 工具栏「拍卡打卡」按钮：打开原生 camera 取景器，默认使用后置镜头。
+  *   用户在取景器右下角点击「切换镜头」即可切换前置/后置摄像头。
    */
   onToolPhoto() {
-    wx.showToast({
-      title: '即将调起相机与相框',
-      icon: 'none',
-      duration: 2000
+    this._safeSetData({
+      cameraVisible: true,
+      cameraPosition: 'back',
+      cameraReady: false
     })
   },
 
   /**
-   * @function onToolHome
-   * @description 工具栏「主页」按钮：先尝试 navigateBack delta=1 返回上一页；
-   *   如果 navigateBack 失败（说明用户已经在栈底，直接从分享卡片进地图页），
-   *   则 reLaunch 到 /pages/index/index 保证一定能回到首页，不卡死在「返回无反应」状态。
+   * 切换原生 camera 组件的前置/后置镜头。
    */
-  onToolHome() {
-    wx.navigateBack({
-      delta: 1,
-      fail: () => {
-        wx.reLaunch({ url: '/pages/index/index' })
+  onSwitchCamera() {
+    const nextPosition = this.data.cameraPosition === 'front' ? 'back' : 'front'
+    this._safeSetData({ cameraPosition: nextPosition })
+  },
+
+  onCameraReady() {
+    this._safeSetData({ cameraReady: true })
+  },
+
+  onTakePhoto() {
+    try {
+      const cameraContext = wx.createCameraContext('captureCamera')
+      if (!cameraContext || typeof cameraContext.takePhoto !== 'function') {
+        throw new Error('cameraContext.takePhoto unavailable')
+      }
+      cameraContext.takePhoto({
+        quality: 'high',
+        success: (res) => {
+          if (!res || !res.tempImagePath) {
+            try { wx.showToast({ title: '未获取到照片', icon: 'none' }) } catch (e) {}
+            return
+          }
+          this._lastPhotoPath = res.tempImagePath
+          this._safeSetData({ cameraVisible: false, photoMode: true, photoPath: res.tempImagePath })
+          try { wx.showToast({ title: '照片已获取', icon: 'success', duration: 1500 }) } catch (e) {}
+        },
+        fail: (err) => {
+          console.error('[拍卡打卡] 原生相机拍照失败:', err)
+          try { wx.showToast({ title: '拍照失败，请检查相机权限', icon: 'none' }) } catch (e) {}
+        }
+      })
+    } catch (e) {
+      console.error('[拍卡打卡] 创建相机上下文异常:', e)
+      try { wx.showToast({ title: '相机暂不可用', icon: 'none' }) } catch (eToast) {}
+    }
+  },
+
+  onCloseCamera() {
+    this._safeSetData({ cameraVisible: false })
+  },
+
+  /** 删除当前照片并返回地图。 */
+  onDeletePhoto() {
+    this._lastPhotoPath = ''
+    this._safeSetData({ photoMode: false, photoPath: '' })
+  },
+
+  /** 将当前临时照片保存到系统相册。 */
+  onSavePhoto() {
+    const filePath = this.data && this.data.photoPath
+    if (!filePath) {
+      try { wx.showToast({ title: '暂无可保存的照片', icon: 'none' }) } catch (e) {}
+      return
+    }
+    const saveComposite = (compositePath) => wx.saveImageToPhotosAlbum({
+      filePath: compositePath || filePath,
+      success: () => {
+        try { wx.showToast({ title: '已保存至相册', icon: 'success' }) } catch (e) {}
+      },
+      fail: (err) => {
+        const message = String((err && err.errMsg) || '')
+        if (message.indexOf('auth deny') > -1 || message.indexOf('authorize') > -1) {
+          try { wx.showModal({ title: '需要相册权限', content: '请在系统设置中允许保存图片到相册。', showCancel: false }) } catch (e) {}
+          return
+        }
+        try { wx.showToast({ title: '保存失败，请重试', icon: 'none' }) } catch (e) {}
       }
     })
+    saveComposite(filePath)
+  },
+
+  /** 微信原生 open-type=share 会打开好友分享面板。 */
+  onShareAppMessage() {
+    return {
+      title: '我在佗城与赵佗一起探索历史',
+      path: '/pages/map-explore/map-explore'
+    }
+  },
+
+  onCameraError(e) {
+    console.error('[拍卡打卡] 相机组件错误:', e && e.detail ? e.detail : e)
+    this._safeSetData({ cameraVisible: false })
+    try { wx.showToast({ title: '无法打开摄像头，请检查权限', icon: 'none' }) } catch (eToast) {}
   },
 
   /**

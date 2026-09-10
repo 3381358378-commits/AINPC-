@@ -455,7 +455,7 @@
         <textarea
           class="keju-textarea"
           value="{{kejuDianshiAnswer}}"
-          placeholder="请在此发表你的治国之策...（字数建议100字以上）"
+          placeholder="请在此发表你的治国之策..."
           placeholder-class="keju-input-placeholder"
           bindinput="onDianshiInput"
           maxlength="500"
@@ -472,33 +472,38 @@
     </view>
   </view>
 
-  <!-- 弹窗6：科举评分 + 结果称号 + 打字机（第三关结果）
+  <!-- 弹窗6：科举三关答案解析 + 赵佗评价 + 结果称号
        绑定：data.showKejuResult
-       展示内容：
-         kejuAwardTitle  ：状元/进士/贡士/举人（大号字）
-         kejuAwardText   ：副标题描述
-         kejuScore.q1    ：乡试对错 乡点亮起
-         kejuScore.q2    ：会试对错 会点亮起
-         kejuScore.dianshiLevel>=2 ：殿试合格 殿点亮起
-         kejuResultText  ：赵佗点评文案（打字机 kejuResultTyping=true 光标）
-       提交按钮：onKejuResultDone → 走过渡到下一站苏堤 -->
+       前三页展示每道题的标准答案、你的作答和解析，第四页展示称号与鼓励语。
+       通过左右滑动或底部按钮翻页，最后一页才可返回巡游。 -->
   <view wx:if="{{showKejuResult}}" class="keju-mask" catchtouchmove="noop">
     <view class="keju-panel keju-panel-large">
       <view class="keju-scroll-deco top"></view>
       <view class="keju-scroll-deco bottom"></view>
-      <view class="keju-result-glow"></view>
-      <view class="keju-result-rank-big">{{kejuAwardTitle}}</view>
-      <view class="keju-result-rank-sub">{{kejuAwardText}}</view>
-      <view class="keju-result-score-bar">
-        <text class="score-dot {{kejuScore.q1 ? 'on' : ''}}">乡</text>
-        <text class="score-dot {{kejuScore.q2 ? 'on' : ''}}">会</text>
-        <text class="score-dot {{kejuScore.dianshiLevel >= 2 ? 'on' : ''}}">殿</text>
+      <swiper class="keju-review-swiper" current="{{kejuReviewPage}}" duration="260" circular="false" bindchange="onKejuReviewChange">
+        <swiper-item wx:for="{{kejuReviewPages}}" wx:key="stage" wx:for-item="review" wx:for-index="reviewIndex">
+          <scroll-view class="keju-review-page review-page-{{reviewIndex}}" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" enable-flex="{{true}}">
+            <view class="keju-review-stage">{{review.stage}}</view>
+            <view class="keju-review-question">{{review.question}}</view>
+            <view class="keju-review-answer">{{review.answer}}</view>
+            <view wx:if="{{review.userAnswer}}" class="keju-review-user">{{review.userAnswer}}</view>
+            <view class="keju-review-analysis">{{review.analysis}}</view>
+            <view wx:if="{{kejuReviewPage === 3}}" class="keju-review-encourage">赵佗寄语：三关已毕，莫问成败，敢于求知、勇于实践，便有继续前行的资格。加油，向下一处山河进发！</view>
+          </scroll-view>
+          <view wx:if="{{reviewIndex === 2}}" class="keju-review-scroll-hint" aria-hidden="true">
+            <text class="keju-review-scroll-arrow">↓</text>
+            <text class="keju-review-scroll-label">下滑查看</text>
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="keju-review-dots">
+        <text wx:for="{{kejuReviewPages}}" wx:key="stage" class="review-dot {{kejuReviewPage === index ? 'active' : ''}}">{{index + 1}}</text>
       </view>
-      <view class="keju-result-bubble">
-        <text class="result-text">{{kejuResultText}}</text>
-        <text wx:if="{{kejuResultTyping}}" class="msg-cursor">|</text>
+      <view class="keju-review-nav">
+        <view class="keju-review-nav-btn {{kejuReviewPage === 0 ? 'disabled' : ''}}" bindtap="onKejuReviewPrev">上一页</view>
+        <view class="keju-review-nav-btn {{kejuReviewPage === 3 ? 'disabled' : ''}}" bindtap="onKejuReviewNext">下一页</view>
       </view>
-      <view class="keju-actions one-col">
+      <view class="keju-actions one-col" wx:if="{{kejuReviewPage === 3}}">
         <view class="keju-btn keju-btn-primary" bindtap="onKejuResultDone">
           <text class="keju-btn-text">传 承 文 脉</text>
         </view>

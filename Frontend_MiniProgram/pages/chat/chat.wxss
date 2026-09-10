@@ -1455,6 +1455,151 @@
   z-index: 2;
 }
 
+/* ============ 科举三关答案复盘：左右滑页 ============ */
+.keju-review-swiper {
+  width: 100%;
+  height: 600rpx;
+  margin-top: 18rpx;
+}
+
+.keju-review-page {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 8rpx 8rpx 20rpx;
+}
+
+/* 第三页内容较长：右侧固定显示下滑提示，不拦截手势 */
+.keju-review-scroll-hint {
+  position: absolute;
+  top: 50%;
+  right: 4rpx;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-50%);
+  color: rgba(240, 215, 157, 0.82);
+  pointer-events: none;
+  text-shadow: 0 0 10rpx rgba(212, 168, 86, 0.7);
+  animation: kejuScrollHint 1.5s ease-in-out infinite;
+}
+
+.keju-review-scroll-arrow {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.keju-review-scroll-label {
+  margin-top: 4rpx;
+  font-size: 19rpx;
+  writing-mode: vertical-rl;
+  letter-spacing: 2rpx;
+}
+
+@keyframes kejuScrollHint {
+  0%, 100% { opacity: 0.48; transform: translateY(-50%); }
+  50% { opacity: 1; transform: translateY(calc(-50% + 10rpx)); }
+}
+
+.keju-review-stage {
+  margin: 8rpx 0 22rpx;
+  color: #d4a856;
+  font-size: 30rpx;
+  font-weight: 700;
+  letter-spacing: 4rpx;
+  text-align: center;
+}
+
+.keju-review-question,
+.keju-review-answer,
+.keju-review-user,
+.keju-review-analysis,
+.keju-review-encourage {
+  display: block;
+  margin-bottom: 16rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+}
+
+.keju-review-question {
+  color: #e8d5a0;
+  background: rgba(212, 168, 86, 0.1);
+  border: 1rpx solid rgba(212, 168, 86, 0.22);
+}
+
+.keju-review-answer {
+  color: #f0d79d;
+  background: rgba(57, 126, 77, 0.18);
+  border-left: 4rpx solid #8fc58a;
+}
+
+.keju-review-user {
+  color: rgba(232, 220, 192, 0.72);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.keju-review-analysis {
+  color: #eee4d0;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 4rpx solid #c9a96e;
+}
+
+.keju-review-encourage {
+  color: #f3d99c;
+  background: rgba(201, 169, 110, 0.14);
+  border: 1rpx solid rgba(201, 169, 110, 0.35);
+  font-weight: 600;
+}
+
+.keju-review-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14rpx;
+  margin: 12rpx 0 18rpx;
+}
+
+.review-dot {
+  width: 34rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  border-radius: 50%;
+  color: rgba(232, 220, 192, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 20rpx;
+  text-align: center;
+}
+
+.review-dot.active {
+  color: #1a1008;
+  background: #d4a856;
+}
+
+.keju-review-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.keju-review-nav-btn {
+  flex: 1;
+  padding: 12rpx 0;
+  color: #e8d5a0;
+  border: 1rpx solid rgba(212, 168, 86, 0.4);
+  border-radius: 8rpx;
+  font-size: 23rpx;
+  text-align: center;
+}
+
+.keju-review-nav-btn.disabled {
+  color: rgba(232, 220, 192, 0.25);
+  border-color: rgba(212, 168, 86, 0.12);
+}
+
 .result-text {
   display: inline;
   font-size: 26rpx;

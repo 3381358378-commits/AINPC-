@@ -9,7 +9,7 @@ import hashlib, os, time, requests, threading, re
 from collections import OrderedDict
 
 # ========== 阿里云 DashScope CosyVoice 配置 ==========
-DASHSCOPE_API_KEY = "sk-ws-H.EYYHEDI.X8i5.MEUCIQDNKRKZkCEbDqDJ5NU9H-RuhArf8wkwQG_CJw1DriDo6wIgbqN4DSphB8tUAd04w4TxYCgBTesldeDVcCnwH_0XgmY"
+DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "YOUR_DASHSCOPE_API_KEY_HERE")
 DASHSCOPE_API_HOST = "ws-xo32obunndyufg81.cn-beijing.maas.aliyuncs.com"
 TTS_MODEL = "cosyvoice-v3-flash"
 TTS_VOICE = "longsanshu_v3"
@@ -69,6 +69,7 @@ def _is_valid_audio(data: bytes) -> bool:
         return False
     return True
 
+# 云端 CosyVoice 调用：提交文本任务后下载完整 MP3，交给缓存和 HTTP 响应层处理。
 def _call_cosyvoice(text: str) -> bytes:
     """强制使用完整的 REST 请求获取纯正 MP3，不使用 websocket 流式"""
     payload = {
@@ -98,6 +99,7 @@ def _call_cosyvoice(text: str) -> bytes:
     if ar.status_code != 200:
         raise RuntimeError(f"Audio download failed HTTP {ar.status_code}")
     
+    # 坏文件拦截器：拒绝云端错误 XML/JSON 或过小响应，避免污染缓存并传给小程序。
     audio_data = ar.content
     if not _is_valid_audio(audio_data):
         raise RuntimeError(f"API返回了非音频数据(大小:{len(audio_data)}). 已拦截.")
@@ -165,9 +167,10 @@ def _send_bytes(data, cache_hit="miss", elapsed=0):
     resp.headers["X-TTS-Time"] = f"{elapsed:.3f}s"
     return resp
 
-# ====== 把两个接口路由全部指向同一个稳定的完整文件处理逻辑 ======
+# ====== HTTP 路由：两个兼容入口统一返回完整 MP3，不使用分块流式传输 ======
 @app.route("/tts", methods=["POST", "GET"])
 def tts_normal():
+    # 普通 TTS 入口，统一交给缓存、云端生成和 Content-Length 返回链路。
     return handle_tts_request()
 
 @app.route("/tts-stream", methods=["POST", "GET"])

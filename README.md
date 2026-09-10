@@ -28,23 +28,40 @@
 
 多达 7 重防闪退保护，严格规范异步渲染校验与音频组件的“置空→停止→延迟→销毁”生命周期。
 
-📁 核心目录与文件职责说明
-Plaintext
-├── app.js / app.json / app.wxss      # 全局入口与主题样式分层定义（含三级错误分类与崩溃防护）
-├── 📂 pages
-│   ├── 🏠 index/                     # 首页（预留游客模式入口，保留基本导航）
-│   ├── 🗺️ map-explore/               # 核心大地图探索页
-│   │   ├── map-explore.js            # 含 10 大闪退防护体系、防野指针销毁机制、3层超时控制
-│   │   └── map-explore.wxml          # 8 大 UI 模块（静音/底图/热区/NPC对话框等）
-│   └── 💬 chat/                      # 沉浸式剧情交互页
-│       ├── chat.js                   # 3400+ 行巨型核心逻辑，划分 33 个章节（含双门闩、科举判卷等）
-│       └── chat.wxml                 # 12 大功能区块（过渡弹窗、打字机特效、动态勋章等）
-├── 📂 utils
-│   └── knowledge.js                  # 前端硬编码的专属文史 RAG 提示词工程知识库
-├── 📂 images/                        # UI 贴图与历史人物素材
-├── 📂 tts_cache/                     # 本地磁盘缓存目录（自动生成）
-├── server.py                         # 轻量级中间件代理服务器（处理 TTS 鉴权与三级缓存漏斗）
-└── project.config.json               # 微信开发者工具配置文件
+📁 代码与数据模块化目录
+
+代码、测试脚本和源数据统一置于项目根目录下的四个一级功能文件夹中，便于竞赛组织方和评审人员识别、管理。
+
+```text
+ZhaoTuo_MiniProgram/
+├── Frontend_MiniProgram/             # 一级模块一：微信小程序前端
+│   ├── app.js / app.json / app.wxss   # 全局入口、页面注册与主题样式
+│   ├── pages/
+│   │   ├── index/                    # 首页与基础导航
+│   │   ├── map-explore/              # 地图探索、景点热区、打卡与导览 TTS
+│   │   └── chat/                     # AI 对话、剧情状态机、答题与打字机渲染
+│   ├── utils/knowledge.js            # 文史知识库与 RAG 提示词模板
+│   ├── images/                       # UI 贴图与历史人物素材
+│   ├── project.config.json           # 微信开发者工具配置
+│   ├── project.private.config.json   # 本地私有配置
+│   └── sitemap.json                  # 小程序页面索引配置
+├── Backend_Service/                  # 一级模块二：Python 后端服务
+│   ├── server.py                     # Flask TTS 代理、音频校验与三级缓存
+│   └── tts_cache/                    # 运行时生成的 MP3 磁盘缓存
+├── Test_Scripts/                     # 一级模块三：性能测试与验证
+│   ├── performance_test.py           # 在线接口性能与缓存测试
+│   ├── performance_test_v2.py        # 离线缓存模拟测试
+│   ├── performance_test_v3.py        # 基于真实 MD5 缓存的测试
+│   └── performance_test_report.txt   # 测试结果报告
+├── Doc_And_Data/                    # 一级模块四：项目文档与源数据
+│   ├── 佗城龙川方志与赵佗史料汇编.docx # 文史知识库原始资料
+│   ├── 旅游路线图及触发情境.docx     # 路线、景点与剧情触发原始资料
+│   ├── 代码架构与模型数据说明.md     # 竞赛提交说明文档
+│   └── 1.docx                       # 项目补充资料
+└── README.md                         # 项目总览与运行说明
+```
+
+提交评审前应删除或排除 `__pycache__/`、`*.pyc`、`.vscode/`、`.claude/`、临时备份目录、调试临时文件和可重新生成的 `Backend_Service/tts_cache/*.mp3`。四个一级功能文件夹及其必要源文件应完整保留。
 🚀 快速开始（二次开发必看）
 为保证项目开源脱敏与本地运行安全，克隆本仓库后，请务必完成以下三步配置方可正常运行：
 
@@ -53,21 +70,63 @@ Plaintext
 
 请前往 阿里云百炼控制台 申请你的 API Key。
 
-打开 pages/chat/chat.js，定位到 §1 API配置 章节。
+打开 `Frontend_MiniProgram/pages/chat/chat.js`，定位到 §1 API 配置章节。
 
 将 YOUR_DASHSCOPE_API_KEY_HERE 占位符替换为你真实的 Key。
 
 2. 替换小程序 AppID
-打开 project.config.json 文件。
+打开 `Frontend_MiniProgram/project.config.json` 文件。
 
 将 touristappid 占位符替换为你自己在微信公众平台申请的小程序 AppID。
 
 3. 启动本地代理服务 (TTS Server)
 确保你的电脑安装了 Python 3.8+。
 
-在项目根目录下运行代理服务：python server.py
+进入 `Backend_Service/` 目录运行代理服务：`python server.py`
 
-⚠️ 端口注意事项： 目前 map-explore.js 默认访问 5001 端口，chat.js 默认访问 5006 端口。如果你的 server.py 只挂载在一个端口，请在 JS 文件中统一修改局域网 IPv4 地址与端口号。若无需语音，可将代码中的 _ENABLE_TTS_AUDIO 设为 false。
+⚠️ 端口注意事项：`server.py` 统一监听 5006 端口，`Frontend_MiniProgram/pages/map-explore/map-explore.js` 和 `Frontend_MiniProgram/pages/chat/chat.js` 默认访问 `http://127.0.0.1:5006`。手机真机测试时，应将地址改为运行后端电脑的局域网 IPv4 地址。若无需语音，可将代码中的 `_ENABLE_TTS_AUDIO` 设为 `false`。
+
+## 模型与数据专门说明
+
+本节按照比赛要求，对项目使用的文史数据、程序内数据格式以及各模型的具体用途进行说明。
+
+### 1. 数据来源
+
+- **核心文史资料**：知识库主要依据 `Doc_And_Data/佗城龙川方志与赵佗史料汇编.docx` 提取整理，内容覆盖赵佗生平、南越国治理、龙川建城、越王井、百岁街、越王庙、考棚、苏堤和正相塔等历史信息。
+- **路线与剧情资料**：依据 `Doc_And_Data/旅游路线图及触发情境.docx` 整理六个景点的游览顺序、触发条件、答题节点、奖励机制和结局分支。
+- **数据整理方式**：项目组对上述 DOCX 原始资料进行人工筛选、核对和结构化整理，形成适用于对话约束、景点触发和答题判定的程序数据。正式参赛时应在源文档中补充具体编者、出版信息、采集日期和页码等可追溯信息。
+
+### 2. 数据格式与存储位置
+
+- **原始资料格式**：文史资料和路线资料以 DOCX 文件保存在 `Doc_And_Data/`，作为项目源数据和评审查阅材料。
+- **知识库格式**：核心史料被整理为 `Frontend_MiniProgram/pages/chat/chat.js` 中的 UTF-8 JavaScript 模板字符串 `KNOWLEDGE_BASE`，作为硬编码 RAG 提示词模板拼接到系统指令中；同时由 `Frontend_MiniProgram/utils/knowledge.js` 提供前端知识库辅助数据。
+- **剧情配置格式**：景点顺序、触发台词、评分条件和奖励流程使用 JavaScript 对象、数组和字符串常量存储，由前端状态机执行。
+- **测试与缓存格式**：性能测试脚本为 Python `.py` 文件，测试报告为 `.txt`；TTS 运行缓存为以文本 MD5 命名的 `.mp3` 文件，属于可重新生成的运行产物，不属于原始模型数据。
+
+### 3. 模型用途说明
+
+#### 通义千问文本模型 `qwen-plus`
+
+通过 DashScope OpenAI 兼容接口处理游客的文本提问和剧情对话，主要用于：
+
+- 百岁街的姓氏互动与历史解释；
+- 越王井、苏堤等景点的文本问答和答题判定；
+- 根据系统角色设定生成赵佗第一人称的沉浸式历史讲解；
+- 严格引用 `KNOWLEDGE_BASE`，降低史实幻觉和剧情串台风险。
+
+景点固定触发台词、过渡台词、越王令奖励和最终结局由前端状态机控制，不依赖模型临时生成，以保证比赛演示稳定性。
+
+#### 通义千问视觉模型 `qwen-vl-max`
+
+用于越王井等看图交互节点。用户通过小程序拍照后，图片被编码为 `data:image/jpeg;base64,...`，以多模态消息内容传入模型。模型结合图片和知识库对古井外观进行辅助识别与解读，再由前端执行答题反馈和剧情推进。
+
+#### CosyVoice 语音模型 `cosyvoice-v3-flash`
+
+由 `Backend_Service/server.py` 通过阿里云 DashScope 调用，使用 `longsanshu_v3` 音色，将固定剧情台词和大模型回复转换为 MP3 音频。请求格式包含文本、音色、`mp3` 格式和 `24000` Hz 采样率；后端下载并校验完整音频后返回给小程序。小程序通过音频播放进度驱动打字机显示，并以“文字渲染完成 + 音频播放完成”双条件保证同步。
+
+### 4. 模型数据安全说明
+
+API Key 仅属于运行配置，不属于提交模型数据。参赛提交前应使用环境变量或脱敏占位符，删除真实密钥并及时轮换已经暴露过的密钥；提交的 DOCX、JavaScript 知识库和测试报告应保留来源、用途及格式说明，确保评审能够区分原始资料、程序提示词和运行缓存。
 
 💡 关键代码设计声明（为何“不删代码”）
 在本项目中，您可能会看到一些看似“冗余”或“啰嗦”的代码，这并非疏漏，而是基于户外景区复杂场景无数次踩坑后的防御性编程：

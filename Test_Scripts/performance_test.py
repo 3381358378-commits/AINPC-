@@ -18,8 +18,11 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TTS_SERVER = "http://127.0.0.1:5001"
-DASHSCOPE_API_KEY = "sk-c017fd5ca70941f4976689bf054641ad"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TTS_SERVER = "http://127.0.0.1:5006"
+CACHE_DIR = os.path.join(PROJECT_ROOT, "Backend_Service", "tts_cache")
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "performance_test_report.txt")
+DASHSCOPE_API_KEY = "YOUR_DASHSCOPE_API_KEY_HERE"  # 开源前替换为占位符，避免真实密钥泄漏
 CHAT_API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 
 # 测试用文本（模拟真实场景）
@@ -129,7 +132,7 @@ def test_tts_latency():
     for name, text in TEST_TEXTS.items():
         # 第一步：确保文本是新的（用于miss测试），先清空缓存
         cache_key = hashlib.md5(text.encode("utf-8")).hexdigest()
-        cache_path = os.path.join("tts_cache", cache_key + ".mp3")
+        cache_path = os.path.join(CACHE_DIR, cache_key + ".mp3")
 
         # 清除已有缓存（确保第一次调用是miss）
         if os.path.exists(cache_path):
@@ -206,7 +209,7 @@ def test_cache_hit_rate():
     print("  [预热阶段] 写入高频讲解词到缓存...")
     for text in warmup_texts:
         cache_key = hashlib.md5(text.encode("utf-8")).hexdigest()
-        cache_path = os.path.join("tts_cache", cache_key + ".mp3")
+        cache_path = os.path.join(CACHE_DIR, cache_key + ".mp3")
         if os.path.exists(cache_path):
             os.remove(cache_path)
         try:
@@ -339,7 +342,7 @@ def test_api_cost_reduction():
 
     # 清空所有缓存
     print("  清空所有缓存...")
-    cache_dir = os.path.join(os.path.dirname(__file__), "tts_cache")
+    cache_dir = CACHE_DIR
     if os.path.exists(cache_dir):
         for f in os.listdir(cache_dir):
             if f.endswith(".mp3"):
@@ -586,7 +589,7 @@ def main():
     print(report_text)
 
     # 保存报告
-    with open("performance_test_report.txt", "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report_text)
     print(f"\n报告已保存至: performance_test_report.txt")
 

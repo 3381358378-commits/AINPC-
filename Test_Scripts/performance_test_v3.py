@@ -7,7 +7,9 @@ import hashlib, os, time, requests, threading, json
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "tts_cache")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_DIR = os.path.join(PROJECT_ROOT, "Backend_Service", "tts_cache")
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "performance_test_report.txt")
 
 # 真实触发台词（这些是在之前的运行中实际生成的TTS文本）
 REAL_TEXTS = [
@@ -556,7 +558,7 @@ def main():
     report_text = "\n".join(report)
     print(report_text)
 
-    with open("performance_test_report.txt", "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report_text)
     print(f"\n[OK] Report saved: performance_test_report.txt")
 
